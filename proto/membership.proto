@@ -1,0 +1,28 @@
+syntax="proto3";
+option go_package = "../pkg/gen_proto";
+
+enum NodeState {
+	ALIVE = 0;
+	DEAD=1;
+}
+
+message TableEntry {
+	string machine_id = 1;
+	int32 heartbeat_counter = 2;
+	string hostname = 3;
+	string port = 4;
+	int64 local_time = 5;
+	NodeState curr_state = 6;
+	int64 marked_dead = 7;
+
+}
+
+message Table {
+	repeated TableEntry entries = 1;
+}
+
+message HeartbeatMessage {
+	Table table = 1;
+	string host = 2;
+	string port = 3;
+}
