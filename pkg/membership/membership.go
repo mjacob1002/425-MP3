@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	pb "github.com/mjacob1002/425-MP3/pkg/gen_proto"
+	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/protobuf/proto"
 	rand "math/rand"
 	"strconv"
@@ -81,6 +82,12 @@ func MakeHeartbeat()(pb.HeartbeatMessage){
 			panic(err);
 		}
 		heartbeat_msg := pb.HeartbeatMessage{Table: &table, Host: host, Port: MEMBERSHIP_PORT}
+		goTime, err := ptypes.TimestampProto(time.Now());
+		if err != nil{
+			fmt.Println(err);
+			log.Println(err);
+		}
+		heartbeat_msg.TimestampField = goTime;
 		return heartbeat_msg;
 }
 
@@ -193,11 +200,13 @@ func ListenForHeartbeats(){
 		}
 		var received_heartbeat = pb.HeartbeatMessage{}
 		err = proto.Unmarshal(buffer[0:n], &received_heartbeat);
+		time_received := time.Now()
 		log.Printf("received a message from %s\n", received_heartbeat.Host);
 		if err != nil {
 			fmt.Println(err);
 			return;
 		}
+		log.Println("Received heartbeat of ", received_heartbeat.Host, " at ", time_received, " when it was timestamped at ", received_heartbeat.TimestampField);
 		// acquire mutex
 		MembershipMutex.Lock();
 		fmt.Println("The heartbeat receieved: %s\n", received_heartbeat.String());
@@ -212,6 +221,9 @@ func PingHeartbeats(){
 		time.Sleep(time.Duration(float64(TIMEOUT) / 3) * time.Second);
 		MembershipMutex.Lock();
 		for key, entry := range(MembershipList){
+			if(key == MEMBERSHIP_ID) {
+				continue;
+			}
 			probability := rand.Float64();
 			if probability <= 3 / float64(len(MembershipList)) {
 				log.Printf("Sending heartbeat from %s to %s\n", MEMBERSHIP_ID, key);

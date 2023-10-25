@@ -1,6 +1,8 @@
 syntax="proto3";
 option go_package = "../pkg/gen_proto";
 
+import "google/protobuf/timestamp.proto";
+
 enum NodeState {
 	ALIVE = 0;
 	DEAD=1;
@@ -14,7 +16,6 @@ message TableEntry {
 	int64 local_time = 5;
 	NodeState curr_state = 6;
 	int64 marked_dead = 7;
-
 }
 
 message Table {
@@ -25,4 +26,6 @@ message HeartbeatMessage {
 	Table table = 1;
 	string host = 2;
 	string port = 3;
+	// Timestamp field
+	google.protobuf.Timestamp timestamp_field =4;
 }
