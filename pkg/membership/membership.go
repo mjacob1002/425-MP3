@@ -14,14 +14,13 @@ import (
 )
 
 // Define node state variables
-var MembershipList = make(map[string]pb.TableEntry)
-var ThisMachineName string
-var ThisMachineId string
-var ThisHostname string
-var ThisPort string
-var Introducer string
-var Lock sync.Mutex
-var DeadMembers = make(map[string]int64)
+var membershipList = make(map[string]pb.TableEntry)
+var thisMachineName string
+var thisMachineId string
+var thisHostname string
+var thisPort string
+var lock sync.Mutex
+var deadMembers = make(map[string]int64)
 var addressCache = make(map[string]*net.UDPAddr)
 
 const (
@@ -33,21 +32,21 @@ const (
 )
 
 func processHeartbeat(heartbeat *pb.HeartbeatMessage) {
-    Lock.Lock()
-    defer Lock.Unlock()
+    lock.Lock()
+    defer lock.Unlock()
 
     for _, entry := range heartbeat.Table.Entries {
         // Skip entry referring to current node
-        if entry.MachineId == ThisMachineId {
+        if entry.MachineId == thisMachineId {
             continue
         }
 
         // Skip entry if node has already been considered dead
-        if _, ok := DeadMembers[entry.MachineId]; ok {
+        if _, ok := deadMembers[entry.MachineId]; ok {
             continue
         }
 
-        if _, ok := MembershipList[entry.MachineId]; !ok {
+        if _, ok := membershipList[entry.MachineId]; !ok {
             // Add new node to membership list
             fmt.Println("Adding new node to membership list:", entry.MachineId)
             newEntry := pb.TableEntry{}
@@ -56,20 +55,20 @@ func processHeartbeat(heartbeat *pb.HeartbeatMessage) {
             newEntry.Hostname = entry.Hostname
             newEntry.Port = entry.Port
             newEntry.LocalTime = time.Now().UnixMilli()
-            MembershipList[newEntry.MachineId] = newEntry
-        } else if entry.HeartbeatCounter > MembershipList[entry.MachineId].HeartbeatCounter {
+            membershipList[newEntry.MachineId] = newEntry
+        } else if entry.HeartbeatCounter > membershipList[entry.MachineId].HeartbeatCounter {
             // Update pre-existing entry to higher heartbeat count
-            updatedEntry := MembershipList[entry.MachineId]
+            updatedEntry := membershipList[entry.MachineId]
             updatedEntry.HeartbeatCounter = entry.HeartbeatCounter
             updatedEntry.LocalTime = time.Now().UnixMilli()
-            MembershipList[updatedEntry.MachineId] = updatedEntry
+            membershipList[updatedEntry.MachineId] = updatedEntry
         }
     }
 }
 
 func listenInitializer() {
     // Initialize socket
-    udpAddress, err := net.ResolveUDPAddr("udp", ":" + ThisPort)
+    udpAddress, err := net.ResolveUDPAddr("udp", ":" + thisPort)
     if err != nil {
         fmt.Errorf("net.ResolveUDPAddr: %v\n", err)
         os.Exit(1)
@@ -103,17 +102,17 @@ func listenInitializer() {
 }
 
 func incrementHeartbeat(){
-    Lock.Lock()
-    defer Lock.Unlock()
+    lock.Lock()
+    defer lock.Unlock()
 
     // Update heartbeat counter for this node in membership list
-    entry, ok := MembershipList[ThisMachineId];
+    entry, ok := membershipList[thisMachineId];
     if !ok {
         fmt.Errorf("Node does not exist in its own membership list\n")
         os.Exit(1)
     }
     entry.HeartbeatCounter = entry.HeartbeatCounter + 1
-    MembershipList[ThisMachineId] = entry
+    membershipList[thisMachineId] = entry
 }
 
 func sendPeriodicHeartbeats() {
@@ -132,13 +131,13 @@ func periodicCleanupTable() {
 }
 
 func sendOutHeartbeats() {
-    Lock.Lock()
-    defer Lock.Unlock()
+    lock.Lock()
+    defer lock.Unlock()
 
     // Get a list of all the machine ids in the membership list
-    machineIds := make([]string, 0, len(MembershipList) - 1)
-    for machineId := range MembershipList {
-        if machineId != ThisMachineId {
+    machineIds := make([]string, 0, len(membershipList) - 1)
+    for machineId := range membershipList {
+        if machineId != thisMachineId {
             machineIds = append(machineIds, machineId)
         }
     }
@@ -151,19 +150,14 @@ func sendOutHeartbeats() {
 
     // Select the machines to gossip to
     k := PEER_TARGET_COUNT
-    if len(MembershipList) - 1 < k {
-        k = len(MembershipList) - 1
+    if len(membershipList) - 1 < k {
+        k = len(membershipList) - 1
     }
     selectedMachineIds := machineIds[:k]
 
     // Gossip and profit
     for _, machineId := range selectedMachineIds {
-        // TODO: Remove this if statement
-        if machineId == ThisMachineId {
-            fmt.Println("This should not be happening bruh")
-        }
-
-        sendHeartbeat(MembershipList[machineId].Hostname, MembershipList[machineId].Port)
+        sendHeartbeat(membershipList[machineId].Hostname, membershipList[machineId].Port)
     }
 }
 
@@ -187,8 +181,8 @@ func resolveUDPAddress(address string) (*net.UDPAddr, error) {
 
 func makeHeartbeatFromMembershipList() (pb.HeartbeatMessage) {
     // Generate array of pointers to each membership list entry
-    membershipArray := make([]*pb.TableEntry, 0, len(MembershipList))
-    for _, value := range MembershipList {
+    membershipArray := make([]*pb.TableEntry, 0, len(membershipList))
+    for _, value := range membershipList {
         copiedValue := value
         membershipArray = append(membershipArray, &copiedValue)
     }
@@ -239,46 +233,45 @@ func sendHeartbeatAddress(address string){
 }
 
 func cleanupTable() {
-    Lock.Lock()
-    defer Lock.Unlock()
+    lock.Lock()
+    defer lock.Unlock()
 
-    for key, value := range MembershipList {
+    for key, value := range membershipList {
         // Skip entry referring to current node
-        if key == ThisMachineId {
+        if key == thisMachineId {
             continue
         }
 
         if time.Now().UnixMilli() - value.LocalTime >= T_FAIL {
             // Delete the node from membership list and add to dead members
-            DeadMembers[key] = value.LocalTime
+            deadMembers[key] = value.LocalTime
             fmt.Println("Deleting node from membership list:", key)
-            delete(MembershipList, key)
+            delete(membershipList, key)
         }
     }
 }
 
 func Join(machineName string, hostname string, port string, introducer string) {
     // Initialize node state variables
-    ThisMachineName = machineName
-    ThisHostname = hostname
-    ThisPort = port
-    Introducer = introducer
-    ThisMachineId = ThisMachineName + "_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+    thisMachineName = machineName
+    thisHostname = hostname
+    thisPort = port
+    thisMachineId = thisMachineName + "_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
 
-    fmt.Println("Joining Node Info:", ThisMachineId, ThisHostname, ThisPort, Introducer)
+    fmt.Println("Joining Node Info:", thisMachineId, thisHostname, thisPort, introducer)
 
     // Add node to membership list
-    MembershipList[ThisMachineId] = pb.TableEntry {
-        MachineId: ThisMachineId,
+    membershipList[thisMachineId] = pb.TableEntry {
+        MachineId: thisMachineId,
         HeartbeatCounter: 0,
-        Hostname: ThisHostname,
-        Port: ThisPort,
+        Hostname: thisHostname,
+        Port: thisPort,
         LocalTime: time.Now().UnixMilli(),
     }
 
     // Introduce node to known node
-    if Introducer != "" {
-        sendHeartbeatAddress(Introducer)
+    if introducer != "" {
+        sendHeartbeatAddress(introducer)
     }
 
     // Start all go routines
