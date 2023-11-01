@@ -1,31 +1,21 @@
 syntax="proto3";
 option go_package = "../pkg/gen_proto";
 
-import "google/protobuf/timestamp.proto";
-
-enum NodeState {
-	ALIVE = 0;
-	DEAD=1;
-}
-
 message TableEntry {
-	string machine_id = 1;
-	int32 heartbeat_counter = 2;
-	string hostname = 3;
-	string port = 4;
-	int64 local_time = 5;
-	NodeState curr_state = 6;
-	int64 marked_dead = 7;
+    string machine_id = 1;
+    int32 heartbeat_counter = 2;
+    string hostname = 4;
+    string port = 5;
+    int64 local_time = 3;
 }
 
 message Table {
-	repeated TableEntry entries = 1;
+    repeated TableEntry entries = 1;
 }
 
+// heartbeat message
 message HeartbeatMessage {
-	Table table = 1;
-	string host = 2;
-	string port = 3;
-	// Timestamp field
-	google.protobuf.Timestamp timestamp_field =4;
+    Table table = 1;
+    string ip_addr = 2;
+    string port = 3;
 }

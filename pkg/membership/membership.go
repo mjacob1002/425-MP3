@@ -1,238 +1,292 @@
 package membership;
 
 import (
-	"fmt"
-	"log"
-	"net"
-	"os"
-	pb "github.com/mjacob1002/425-MP3/pkg/gen_proto"
-	"github.com/golang/protobuf/ptypes"
-	"google.golang.org/protobuf/proto"
-	rand "math/rand"
-	"strconv"
-	"sync"
-	"time"
+    "fmt"
+    "time"
+    "strconv"
+    "sync"
+    "net"
+    "os"
+    "math/rand"
+
+    "google.golang.org/protobuf/proto"
+    pb "github.com/mjacob1002/425-MP3/pkg/gen_proto"
 )
 
-var MEMBERSHIP_ID string;
-var MEMBERSHIP_PORT string;
-var LogicalNode int64;
-var MembershipConnection *net.UDPConn;
-var MembershipMutex sync.Mutex;
-var MembershipList = make(map[string]pb.TableEntry);
-var MEMBERSHIP_TIMEOUT int64;
-var TIMEOUT int64;
-var TIMEOUT_CLEANUP int64;
+// Define node state variables
+var MembershipList = make(map[string]pb.TableEntry)
+var ThisMachineName string
+var ThisMachineId string
+var ThisHostname string
+var ThisPort string
+var Introducer string
+var Lock sync.Mutex
+var DeadMembers = make(map[string]int64)
+var addressCache = make(map[string]*net.UDPAddr)
 
+const (
+    T_FAIL = 4000
+    MAX_UDP_PACKET = 65535
+    HEARTBEAT_FREQUENCY = 100
+    CLEANUP_FREQUENCY = 500
+    PEER_TARGET_COUNT = 4
+)
 
-func SetupMembershipPort(){
-	s, err := net.ResolveUDPAddr("udp4", ":" + MEMBERSHIP_PORT);
-	if err != nil {
-		fmt.Println(err);
-		return;
-	}
-	fmt.Println("My own socket", s);
-	MembershipConnection, err = net.ListenUDP("udp4", s);
-	fmt.Println("My own connection: ", MembershipConnection);
-	if err != nil {
-		fmt.Println(err);
-		return;
-	}
+func processHeartbeat(heartbeat *pb.HeartbeatMessage) {
+    Lock.Lock()
+    defer Lock.Unlock()
+
+    for _, entry := range heartbeat.Table.Entries {
+        // Skip entry referring to current node
+        if entry.MachineId == ThisMachineId {
+            continue
+        }
+
+        // Skip entry if node has already been considered dead
+        if _, ok := DeadMembers[entry.MachineId]; ok {
+            continue
+        }
+
+        if _, ok := MembershipList[entry.MachineId]; !ok {
+            // Add new node to membership list
+            fmt.Println("Adding new node to membership list:", entry.MachineId)
+            newEntry := pb.TableEntry{}
+            newEntry.MachineId = entry.MachineId
+            newEntry.HeartbeatCounter = entry.HeartbeatCounter
+            newEntry.Hostname = entry.Hostname
+            newEntry.Port = entry.Port
+            newEntry.LocalTime = time.Now().UnixMilli()
+            MembershipList[newEntry.MachineId] = newEntry
+        } else if entry.HeartbeatCounter > MembershipList[entry.MachineId].HeartbeatCounter {
+            // Update pre-existing entry to higher heartbeat count
+            updatedEntry := MembershipList[entry.MachineId]
+            updatedEntry.HeartbeatCounter = entry.HeartbeatCounter
+            updatedEntry.LocalTime = time.Now().UnixMilli()
+            MembershipList[updatedEntry.MachineId] = updatedEntry
+        }
+    }
 }
 
-func InitializeMembership(){
-	MEMBERSHIP_ID = strconv.Itoa(int(LogicalNode)) + strconv.Itoa(int(time.Now().Unix()))
-	TIMEOUT = 3
-	TIMEOUT_CLEANUP = 3
-	log.Printf("New Membership ID created: %s\n", MEMBERSHIP_ID);
-	SetupMembershipPort();
-	hostname, err := os.Hostname();
-	if err != nil {
-		fmt.Println(err);
-		os.Exit(1)
-	}
-	MembershipList[MEMBERSHIP_ID] = pb.TableEntry{MachineId: MEMBERSHIP_ID, HeartbeatCounter: 0, Hostname: hostname, Port: MEMBERSHIP_PORT, LocalTime: time.Now().Unix(), CurrState: pb.NodeState_ALIVE}
-	log.Println("Added myself to my membership list: ", MembershipList[MEMBERSHIP_ID]);
+func listenInitializer() {
+    // Initialize socket
+    udpAddress, err := net.ResolveUDPAddr("udp", ":" + ThisPort)
+    if err != nil {
+        fmt.Errorf("net.ResolveUDPAddr: %v\n", err)
+        os.Exit(1)
+    }
+
+    conn, err := net.ListenUDP("udp", udpAddress)
+    if err != nil {
+        fmt.Errorf("net.ListenUDP: %v\n", err)
+        os.Exit(1)
+    }
+    defer conn.Close()
+
+    buffer := make([]byte, MAX_UDP_PACKET)
+    for {
+        // Read packets
+        n, _, err := conn.ReadFromUDP(buffer)
+        if err != nil {
+            fmt.Errorf("conn.ReadFromUDP: %v\n", err)
+        }
+
+        // Parse protobuf messages
+        message := &pb.HeartbeatMessage{}
+        if err := proto.Unmarshal(buffer[0:n], message); err != nil {
+            fmt.Errorf("proto.Unmarshal: %v\n", err)
+            continue
+        }
+
+        // Pass message to helper function
+        processHeartbeat(message)
+    }
 }
 
-func MakeHeartbeat()(pb.HeartbeatMessage){
-		// increment my own heartbeat
-		entry, ok := MembershipList[MEMBERSHIP_ID]
-		if ok {
-			log.Printf("The heartbeat of %s: %s\n", MEMBERSHIP_ID, entry.String());
-			entry.HeartbeatCounter = entry.HeartbeatCounter + 1;
-			entry.LocalTime = time.Now().Unix()
-			MembershipList[MEMBERSHIP_ID] = entry;
-			log.Printf("The new heartbeat for myself: %s\n", entry.String());
-		} else {
-			log.Println("Something went wrong when trying to acess MEMBERSHIP_ID key in the map");
-		}
-		alive_list := []*pb.TableEntry{}
-		for _, entry := range(MembershipList){
-			if(entry.CurrState == pb.NodeState_ALIVE){
-				copied_entry := entry
-				alive_list = append(alive_list, &copied_entry);
-			}
-		}
-		table := pb.Table{}
-		table.Entries = alive_list;
-		host, err := os.Hostname()
-		if err != nil {
-			log.Println(err);
-			panic(err);
-		}
-		heartbeat_msg := pb.HeartbeatMessage{Table: &table, Host: host, Port: MEMBERSHIP_PORT}
-		goTime, err := ptypes.TimestampProto(time.Now());
-		if err != nil{
-			fmt.Println(err);
-			log.Println(err);
-		}
-		heartbeat_msg.TimestampField = goTime;
-		return heartbeat_msg;
+func incrementHeartbeat(){
+    Lock.Lock()
+    defer Lock.Unlock()
+
+    // Update heartbeat counter for this node in membership list
+    entry, ok := MembershipList[ThisMachineId];
+    if !ok {
+        fmt.Errorf("Node does not exist in its own membership list\n")
+        os.Exit(1)
+    }
+    entry.HeartbeatCounter = entry.HeartbeatCounter + 1
+    MembershipList[ThisMachineId] = entry
 }
 
-func SendHeartbeatMessage(heartbeat pb.HeartbeatMessage, address string) {
-		log.Println("inside the heartbeat function")
-		log.Printf("Going to translate following address: %s\n", address)
-		dst, err := net.ResolveUDPAddr("udp4", address);
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		log.Println("resolved udp address, trying to write to it now: ", dst)
-		payload_str, err := proto.Marshal(&heartbeat)// FINISH THIS LINE 
-		if err != nil {
-			log.Println(err);
-			return;
-		}
-		payload := []byte(payload_str)
-		num_bytes_written , err := MembershipConnection.WriteToUDP(payload, dst)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		log.Printf("wrote %d bytes\n", num_bytes_written);
+func sendPeriodicHeartbeats() {
+    for {
+        time.Sleep(HEARTBEAT_FREQUENCY * time.Millisecond)
+        incrementHeartbeat()
+        sendOutHeartbeats()
+    }
 }
 
-
-func MergeTables(table pb.Table){
-	for _, entry := range(table.Entries){
-			fmt.Printf("Currently looking at this entry that I received: %s\n", entry.String());
-			log.Println("Currently looking at this entry that I received: %s\n", entry.String());
-			if entry.CurrState == pb.NodeState_DEAD {
-				// they marked the node as dead, I don't care
-				log.Println("The other marked %s as dead, I don't care...", entry.MachineId);
-				continue;
-			}
-			val, ok := MembershipList[entry.MachineId];
-			if !ok { // 
-				log.Println("I don't have the entry of %s. Will add %s now \n", entry.MachineId, entry.String());
-				entry.LocalTime = time.Now().Unix(); // local time
-				MembershipList[entry.MachineId] = *entry;
-				list_obj, ok := MembershipList[entry.MachineId];
-				if(!ok){
-					log.Println("Didn't insert properly\n");
-					os.Exit(1);
-				}
-				list_ptr := &list_obj
-				log.Printf("Entry receieved: %s, Entry inserted: %s\n", entry.String(), list_ptr.String());
-			} else {
-				if (val.CurrState == pb.NodeState_DEAD){
-					// I marked this node as dead, i don't care
-					log.Println("I has marked %s as dead, I don't care...\n", val.MachineId);
-					continue;
-				}
-				if(val.HeartbeatCounter >= entry.HeartbeatCounter){
-					log.Printf("Not updating entry for %s; I have heartbeat counter of %d while the other is %d\n", entry.MachineId, val.HeartbeatCounter, entry.HeartbeatCounter);
-					continue; // no needto update, I have a more up to date entry
-				} else {
-					entry.LocalTime = time.Now().Unix();
-					log.Println(MembershipList[entry.MachineId]);
-					MembershipList[entry.MachineId] = *entry;
-					log.Println(MembershipList[entry.MachineId]);
-					log.Printf("Updated entry for %s to %s\n", entry.MachineId, entry.String());
-					fmt.Printf("Updated entry for %s to %s\n", entry.MachineId, entry.String());
-				}
-			}
-	}
+func periodicCleanupTable() {
+    for {
+        time.Sleep(CLEANUP_FREQUENCY * time.Millisecond)
+        cleanupTable()
+    }
 }
 
-func PruneTable() {
-	for {
-		// sleep for timeout
-		time.Sleep(time.Duration(TIMEOUT) * time.Second);
-		// acquire mutex
-		MembershipMutex.Lock();
-		for key, entry := range(MembershipList){
-			if entry.CurrState == pb.NodeState_DEAD {
-				if time.Now().Unix() - entry.MarkedDead >= TIMEOUT_CLEANUP {
-					fmt.Printf("Cleaning up %s\n", entry.MachineId);
-					log.Printf("Cleaning up %s\n", entry.MachineId);
-					// remove the entry from the list
-					delete(MembershipList, key);
-					fmt.Println("BLAH BLAH BLAH BLAH BLAH _----------------------------->\n\n\n\n");
-					log.Println("BLAH BLAH BLAH BLAH BLAH _----------------------------->\n\n\n\n");
-				}
-			} else if time.Now().Unix() - entry.LocalTime >= TIMEOUT {
-				fmt.Printf("Marked %s dead at %d\n", entry.MachineId, entry.MarkedDead);
-				entry.CurrState = pb.NodeState_DEAD;
-				entry.MarkedDead = time.Now().Unix();
-				log.Printf("Marked %s dead at %d\n", entry.MachineId, entry.MarkedDead);
-				MembershipList[key] = entry;
-			} else {
-				log.Printf("%s is safe and presumed alive\n", entry.MachineId);
-				fmt.Printf("%s is Alive because difference was only %d when time out is  %d at %d with LocalTime=%d\n", entry.MachineId, time.Now().Unix() - entry.LocalTime, TIMEOUT, time.Now().Unix(), entry.LocalTime);
-			}
-		}
-		MembershipMutex.Unlock();
-	}
+func sendOutHeartbeats() {
+    Lock.Lock()
+    defer Lock.Unlock()
+
+    // Get a list of all the machine ids in the membership list
+    machineIds := make([]string, 0, len(MembershipList) - 1)
+    for machineId := range MembershipList {
+        if machineId != ThisMachineId {
+            machineIds = append(machineIds, machineId)
+        }
+    }
+
+    // Shuffle the array
+    for i := len(machineIds) - 1; i > 0; i-- {
+        j := rand.Intn(i + 1)
+        machineIds[i], machineIds[j] = machineIds[j], machineIds[i]
+    }
+
+    // Select the machines to gossip to
+    k := PEER_TARGET_COUNT
+    if len(MembershipList) - 1 < k {
+        k = len(MembershipList) - 1
+    }
+    selectedMachineIds := machineIds[:k]
+
+    // Gossip and profit
+    for _, machineId := range selectedMachineIds {
+        // TODO: Remove this if statement
+        if machineId == ThisMachineId {
+            fmt.Println("This should not be happening bruh")
+        }
+
+        sendHeartbeat(MembershipList[machineId].Hostname, MembershipList[machineId].Port)
+    }
 }
 
-func ListenForHeartbeats(){
-	for {
-		// read
-		buffer := make([]byte , 4096);
-		log.Println("waiting for message")
-		n, _, err := MembershipConnection.ReadFromUDP(buffer)
-		if err != nil {
-			fmt.Println(err);
-			return
-		}
-		var received_heartbeat = pb.HeartbeatMessage{}
-		err = proto.Unmarshal(buffer[0:n], &received_heartbeat);
-		time_received := time.Now()
-		log.Printf("received a message from %s\n", received_heartbeat.Host);
-		if err != nil {
-			fmt.Println(err);
-			return;
-		}
-		log.Println("Received heartbeat of ", received_heartbeat.Host, " at ", time_received, " when it was timestamped at ", received_heartbeat.TimestampField);
-		// acquire mutex
-		MembershipMutex.Lock();
-		fmt.Println("The heartbeat receieved: %s\n", received_heartbeat.String());
-		MergeTables(*(received_heartbeat.Table))
-		MembershipMutex.Unlock();
-		// relinquish mutex
-	}
+func resolveUDPAddress(address string) (*net.UDPAddr, error) {
+    // Check cache map
+    if cachedAddress, ok := addressCache[address]; ok {
+        return cachedAddress, nil
+    }
+
+    // Manually call the underlying resolve function
+    udpAddr, err := net.ResolveUDPAddr("udp", address)
+    if err != nil {
+        return nil, err
+    }
+
+    // Store the result in the cache
+    addressCache[address] = udpAddr
+
+    return udpAddr, nil
 }
 
-func PingHeartbeats(){
-	for {
-		time.Sleep(time.Duration(float64(TIMEOUT) / 3) * time.Second);
-		MembershipMutex.Lock();
-		for key, entry := range(MembershipList){
-			if(key == MEMBERSHIP_ID) {
-				continue;
-			}
-			probability := rand.Float64();
-			if probability <= 3 / float64(len(MembershipList)) {
-				log.Printf("Sending heartbeat from %s to %s\n", MEMBERSHIP_ID, key);
-				new_dst := entry.Hostname + ":" + entry.Port;
-				SendHeartbeatMessage(MakeHeartbeat(), new_dst);
-			}
-		}
-		MembershipMutex.Unlock();
-	}
+func makeHeartbeatFromMembershipList() (pb.HeartbeatMessage) {
+    // Generate array of pointers to each membership list entry
+    membershipArray := make([]*pb.TableEntry, 0, len(MembershipList))
+    for _, value := range MembershipList {
+        copiedValue := value
+        membershipArray = append(membershipArray, &copiedValue)
+    }
+
+    // Generate membership list table
+    membershipTable := pb.Table{ Entries : membershipArray }
+
+    // Generate heartbeat message
+    heartbeatMessage := pb.HeartbeatMessage{
+        Table: &membershipTable,
+    }
+
+    return heartbeatMessage
 }
 
+func sendHeartbeat(hostname string, port string){
+    sendHeartbeatAddress(hostname + ":" + port)
+}
+
+func sendHeartbeatAddress(address string){
+    // Setup connection
+    udpAddr, err := resolveUDPAddress(address)
+    if err != nil {
+        fmt.Errorf("resolveUDPAddress: \n", err)
+        os.Exit(1)
+    }
+
+    conn, err := net.DialUDP("udp", nil, udpAddr)
+    if err != nil{
+        fmt.Errorf("net.DialUDP: %v\n", err)
+        return
+    }
+    defer conn.Close()
+
+    // Create the hearbeat
+    heartbeat := makeHeartbeatFromMembershipList()
+    serializedHeartbeat, err := proto.Marshal(&heartbeat)
+    if err != nil{
+        fmt.Errorf("proto.Marshal: %v\n", err)
+        return
+    }
+
+    // Write serialized heartbeat to connection
+    _, err = conn.Write(serializedHeartbeat)
+    if err != nil{
+        fmt.Errorf("conn.Write: %v\n", err)
+    }
+}
+
+func cleanupTable() {
+    Lock.Lock()
+    defer Lock.Unlock()
+
+    for key, value := range MembershipList {
+        // Skip entry referring to current node
+        if key == ThisMachineId {
+            continue
+        }
+
+        if time.Now().UnixMilli() - value.LocalTime >= T_FAIL {
+            // Delete the node from membership list and add to dead members
+            DeadMembers[key] = value.LocalTime
+            fmt.Println("Deleting node from membership list:", key)
+            delete(MembershipList, key)
+        }
+    }
+}
+
+func Join(machineName string, hostname string, port string, introducer string) {
+    // Initialize node state variables
+    ThisMachineName = machineName
+    ThisHostname = hostname
+    ThisPort = port
+    Introducer = introducer
+    ThisMachineId = ThisMachineName + "_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+
+    fmt.Println("Joining Node Info:", ThisMachineId, ThisHostname, ThisPort, Introducer)
+
+    // Add node to membership list
+    MembershipList[ThisMachineId] = pb.TableEntry {
+        MachineId: ThisMachineId,
+        HeartbeatCounter: 0,
+        Hostname: ThisHostname,
+        Port: ThisPort,
+        LocalTime: time.Now().UnixMilli(),
+    }
+
+    // Introduce node to known node
+    if Introducer != "" {
+        sendHeartbeatAddress(Introducer)
+    }
+
+    // Start all go routines
+    go listenInitializer()
+    go sendPeriodicHeartbeats()
+    go periodicCleanupTable()
+
+    // Wait
+    select {}
+}
 
