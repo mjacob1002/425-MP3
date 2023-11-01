@@ -29,7 +29,7 @@ const (
     MAX_UDP_PACKET = 65535
     HEARTBEAT_FREQUENCY = 100
     CLEANUP_FREQUENCY = 500
-    PEER_TARGET_COUNT = 10
+    PEER_TARGET_COUNT = 4
 )
 
 func processHeartbeat(heartbeat *pb.HeartbeatMessage) {
