@@ -23,6 +23,9 @@ var lock sync.Mutex
 var deadMembers = make(map[string]int64)
 var addressCache = make(map[string]*net.UDPAddr)
 
+var thisAddCallback func(string)
+var thisDeleteCallback func(string)
+
 const (
     T_FAIL = 4000
     MAX_UDP_PACKET = 65535
@@ -48,7 +51,6 @@ func processHeartbeat(heartbeat *pb.HeartbeatMessage) {
 
         if _, ok := membershipList[entry.MachineId]; !ok {
             // Add new node to membership list
-            fmt.Println("Adding new node to membership list:", entry.MachineId)
             newEntry := pb.TableEntry{}
             newEntry.MachineId = entry.MachineId
             newEntry.HeartbeatCounter = entry.HeartbeatCounter
@@ -56,6 +58,7 @@ func processHeartbeat(heartbeat *pb.HeartbeatMessage) {
             newEntry.Port = entry.Port
             newEntry.LocalTime = time.Now().UnixMilli()
             membershipList[newEntry.MachineId] = newEntry
+            go thisAddCallback(entry.MachineId)
         } else if entry.HeartbeatCounter > membershipList[entry.MachineId].HeartbeatCounter {
             // Update pre-existing entry to higher heartbeat count
             updatedEntry := membershipList[entry.MachineId]
@@ -245,18 +248,20 @@ func cleanupTable() {
         if time.Now().UnixMilli() - value.LocalTime >= T_FAIL {
             // Delete the node from membership list and add to dead members
             deadMembers[key] = value.LocalTime
-            fmt.Println("Deleting node from membership list:", key)
             delete(membershipList, key)
+            go thisDeleteCallback(key)
         }
     }
 }
 
-func Join(machineName string, hostname string, port string, introducer string) {
+func Join(machineName string, hostname string, port string, introducer string, addCallback func(string), deleteCallback func(string)) {
     // Initialize node state variables
     thisMachineName = machineName
     thisHostname = hostname
     thisPort = port
     thisMachineId = thisMachineName + "_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+    thisAddCallback = addCallback
+    thisDeleteCallback = deleteCallback
 
     fmt.Println("Joining Node Info:", thisMachineId, thisHostname, thisPort, introducer)
 
