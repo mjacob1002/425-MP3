@@ -49,7 +49,7 @@ func onDelete(machineId string) {
 		return machineIdsIHash >= machineIdHash
 	})
 
-    machineIds := append(machineIds[:index], machineIds[index+1:]...)
+    machineIds = append(machineIds[:index], machineIds[index+1:]...)
 }
 
 func main() {
