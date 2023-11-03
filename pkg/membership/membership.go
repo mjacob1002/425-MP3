@@ -3,7 +3,6 @@ package membership;
 import (
     "fmt"
     "time"
-    "strconv"
     "sync"
     "net"
     "os"
@@ -15,7 +14,6 @@ import (
 
 // Define node state variables
 var membershipList = make(map[string]pb.TableEntry)
-var thisMachineName string
 var thisMachineId string
 var thisHostname string
 var thisPort string
@@ -254,12 +252,11 @@ func cleanupTable() {
     }
 }
 
-func Join(machineName string, hostname string, port string, introducer string, addCallback func(string), deleteCallback func(string)) {
+func Join(machineId string, hostname string, port string, introducer string, addCallback func(string), deleteCallback func(string)) {
     // Initialize node state variables
-    thisMachineName = machineName
     thisHostname = hostname
     thisPort = port
-    thisMachineId = thisMachineName + "_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+    thisMachineId = machineId
     thisAddCallback = addCallback
     thisDeleteCallback = deleteCallback
 
