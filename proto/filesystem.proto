@@ -1,10 +1,10 @@
 syntax="proto3";
-option go_package = "../pkg/gen_proto";
+option go_package = "../pkg/filesystem";
 
 service FileSystem {
-	rpc Get(GetRequest) returns (stream GetResponse);
-	rpc Put(stream PutRequest) returns (PutResponse);
-	rpc Delete(DeleteRequest) returns (DeleteResponse);
+	rpc Get(GetRequest) returns (stream GetResponse) {}
+	rpc Put(stream PutRequest) returns (PutResponse) {}
+	rpc Delete(DeleteRequest) returns (DeleteResponse) {}
 }
 
 message GetRequest {
