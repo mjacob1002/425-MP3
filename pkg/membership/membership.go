@@ -58,6 +58,7 @@ func processHeartbeat(heartbeat *pb.HeartbeatMessage) {
             newEntry.LocalTime = time.Now().UnixMilli()
 			newEntry.TcpPort= fs.Tcp_port // new for MP3
             MembershipList[newEntry.MachineId] = newEntry
+			fmt.Printf("Just received new entry of %s\n", newEntry.String())
 			serverAddress := fmt.Sprintf("%s:%d", newEntry.Hostname,newEntry.TcpPort)
             go thisAddCallback(entry.MachineId, serverAddress)
         } else if entry.HeartbeatCounter > MembershipList[entry.MachineId].HeartbeatCounter {

@@ -4,11 +4,11 @@ import (
     "flag"
     "fmt"
     "strconv"
-	"net"
 	"log"
     "time"
     "sort"
     "hash/fnv"
+	"io"
     membership "github.com/mjacob1002/425-MP3/pkg/membership"
 	"google.golang.org/grpc"
 	"golang.org/x/net/context"
@@ -19,7 +19,8 @@ var thisMachineName string
 var thisMachineId string
 var machineIds []string = []string{}
 // stores the stubs used for gRPC methods
-var machineStubs map[string] fs.FileSystemClient;
+var machineStubs map[string] fs.FileSystemClient = make(map[string]fs.FileSystemClient)
+
 
 func onAdd(machineId string, serverAddress string) {
     fmt.Println("Adding new node to membership list:", machineId)
@@ -38,6 +39,7 @@ func onAdd(machineId string, serverAddress string) {
 	})
 
 	machineIds = append(machineIds[:index], append([]string{machineId}, machineIds[index:]...)...)
+	fmt.Println("Trying to connect to ", serverAddress);
 	conn, err := grpc.Dial(serverAddress)
 	if err != nil {
 		fmt.Println(err);
@@ -46,6 +48,7 @@ func onAdd(machineId string, serverAddress string) {
 	// we should lock the machineStubs map
 	machineStubs[machineId] = client;
 	// unlock mutex
+	fmt.Println("Just added the following's gRPC stuff: ", machineId, " with clientStub of ", machineStubs[machineId], " but client is ", client);
 }
 
 func onDelete(machineId string) {
@@ -80,17 +83,8 @@ func main() {
     thisMachineId = (thisMachineName + "_" + strconv.FormatInt(time.Now().UnixMilli(), 10))
     machineIds = append(machineIds, thisMachineId)
 	fmt.Printf("I am using tcp_port %d\n", fs.Tcp_port);
-	// from GRPC
-		lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", fs.Tcp_port))
-		if err != nil {
-		  log.Fatalf("failed to listen: %v", err)
-		}
-		grpcServer := grpc.NewServer()
-		server := fs.FileSystemServerStub{}
-		fs.RegisterFileSystemServer(grpcServer, &server)
-		grpcServer.Serve(lis)
-
-    go membership.Join(
+	go fs.InitializeGRPCServer()
+	go membership.Join(
         thisMachineId,
         hostname,
         port,
@@ -100,14 +94,25 @@ func main() {
     )
 
     // select {}
-	time.Sleep(20)
-	for _, value := range(machineStubs){
-		req := fs.GetRequest{SdfsName: "sdfsfile", LocalName: "localfname"} 
-		res, err := value.Get(context.Background(), &req);
+	time.Sleep(20 * time.Second)
+	fmt.Println("Time to test RPC..");
+	for key, value := range(machineStubs){
+		fmt.Println("Working with key=", key);
+		req := fs.GetRequest{SdfsName: "sdfsfile", LocalName: "localfname"} // create a request
+		stream, err := value.Get(context.Background(), &req);
 		if err != nil {
 			fmt.Println(err);
 		}
-		fmt.Printf("Response: %s\n", res.String());
+		for {
+			resp, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Fatal(err);
+			}
+			fmt.Printf("Response: %s\n", resp.String())
+		}
 	}
 
 }
