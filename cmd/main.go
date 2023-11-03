@@ -23,5 +23,7 @@ func main() {
     flag.StringVar(&introducer, "introducer", "", "Introducer Node Address")
     flag.Parse()
 
-    membership.Join(machine_name, hostname, port, introducer, onAdd, onDelete)
+    go membership.Join(machine_name, hostname, port, introducer, onAdd, onDelete)
+
+    select {}
 }
