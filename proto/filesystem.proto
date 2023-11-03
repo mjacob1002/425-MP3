@@ -1,0 +1,37 @@
+syntax="proto3";
+option go_package = "../pkg/gen_proto";
+
+service FileSystem {
+	rpc Get(GetRequest) returns (stream GetResponse);
+	rpc Put(stream PutRequest) returns (PutResponse);
+	rpc Delete(DeleteRequest) returns (DeleteResponse);
+}
+
+message GetRequest {
+	string payload = 1;
+	string sdfs_name = 2;
+	string local_name = 3;
+}
+
+message GetResponse{
+	int64 err = 1;
+}
+
+message PutRequest {
+	string payload_to_write = 1;
+	string sdfs_name = 2;
+	string local_name = 3;
+}
+
+message PutResponse {
+	int64 err = 1;
+}
+
+message DeleteRequest {
+	string sdfs_name = 1;
+}
+
+message DeleteResponse {
+	int64 err = 1;
+}
+
