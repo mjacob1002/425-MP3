@@ -6,7 +6,7 @@ PROTOC=protoc
 
 
 proto: proto/*.proto
-	$(PROTOC) --go_out=proto/ proto/*.proto
+	$(PROTOC) --go_out=proto/ --go-grpc_out=proto/  proto/*.proto
 
 clean: 
 	rm -r pkg/gen_proto/*

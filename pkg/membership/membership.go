@@ -10,10 +10,11 @@ import (
 
     "google.golang.org/protobuf/proto"
     pb "github.com/mjacob1002/425-MP3/pkg/gen_proto"
+	fs "github.com/mjacob1002/425-MP3/pkg/filesystem"
 )
 
 // Define node state variables
-var membershipList = make(map[string]pb.TableEntry)
+var MembershipList = make(map[string]pb.TableEntry)
 var thisMachineId string
 var thisHostname string
 var thisPort string
@@ -21,7 +22,7 @@ var lock sync.Mutex
 var deadMembers = make(map[string]int64)
 var addressCache = make(map[string]*net.UDPAddr)
 
-var thisAddCallback func(string)
+var thisAddCallback func(string, string)
 var thisDeleteCallback func(string)
 
 const (
@@ -47,7 +48,7 @@ func processHeartbeat(heartbeat *pb.HeartbeatMessage) {
             continue
         }
 
-        if _, ok := membershipList[entry.MachineId]; !ok {
+        if _, ok := MembershipList[entry.MachineId]; !ok {
             // Add new node to membership list
             newEntry := pb.TableEntry{}
             newEntry.MachineId = entry.MachineId
@@ -55,14 +56,17 @@ func processHeartbeat(heartbeat *pb.HeartbeatMessage) {
             newEntry.Hostname = entry.Hostname
             newEntry.Port = entry.Port
             newEntry.LocalTime = time.Now().UnixMilli()
-            membershipList[newEntry.MachineId] = newEntry
-            go thisAddCallback(entry.MachineId)
-        } else if entry.HeartbeatCounter > membershipList[entry.MachineId].HeartbeatCounter {
+			newEntry.TcpPort= entry.TcpPort// new for MP3
+            MembershipList[newEntry.MachineId] = newEntry
+			fmt.Printf("Just received new entry of %s\n", newEntry.String())
+			serverAddress := fmt.Sprintf("%s:%d", newEntry.Hostname,newEntry.TcpPort)
+            go thisAddCallback(entry.MachineId, serverAddress)
+        } else if entry.HeartbeatCounter > MembershipList[entry.MachineId].HeartbeatCounter {
             // Update pre-existing entry to higher heartbeat count
-            updatedEntry := membershipList[entry.MachineId]
+            updatedEntry := MembershipList[entry.MachineId]
             updatedEntry.HeartbeatCounter = entry.HeartbeatCounter
             updatedEntry.LocalTime = time.Now().UnixMilli()
-            membershipList[updatedEntry.MachineId] = updatedEntry
+            MembershipList[updatedEntry.MachineId] = updatedEntry
         }
     }
 }
@@ -107,13 +111,13 @@ func incrementHeartbeat(){
     defer lock.Unlock()
 
     // Update heartbeat counter for this node in membership list
-    entry, ok := membershipList[thisMachineId];
+    entry, ok := MembershipList[thisMachineId];
     if !ok {
         fmt.Errorf("Node does not exist in its own membership list\n")
         os.Exit(1)
     }
     entry.HeartbeatCounter = entry.HeartbeatCounter + 1
-    membershipList[thisMachineId] = entry
+    MembershipList[thisMachineId] = entry
 }
 
 func sendPeriodicHeartbeats() {
@@ -136,8 +140,8 @@ func sendOutHeartbeats() {
     defer lock.Unlock()
 
     // Get a list of all the machine ids in the membership list
-    machineIds := make([]string, 0, len(membershipList) - 1)
-    for machineId := range membershipList {
+    machineIds := make([]string, 0, len(MembershipList) - 1)
+    for machineId := range MembershipList {
         if machineId != thisMachineId {
             machineIds = append(machineIds, machineId)
         }
@@ -151,14 +155,14 @@ func sendOutHeartbeats() {
 
     // Select the machines to gossip to
     k := PEER_TARGET_COUNT
-    if len(membershipList) - 1 < k {
-        k = len(membershipList) - 1
+    if len(MembershipList) - 1 < k {
+        k = len(MembershipList) - 1
     }
     selectedMachineIds := machineIds[:k]
 
     // Gossip and profit
     for _, machineId := range selectedMachineIds {
-        sendHeartbeat(membershipList[machineId].Hostname, membershipList[machineId].Port)
+        sendHeartbeat(MembershipList[machineId].Hostname, MembershipList[machineId].Port)
     }
 }
 
@@ -182,8 +186,8 @@ func resolveUDPAddress(address string) (*net.UDPAddr, error) {
 
 func makeHeartbeatFromMembershipList() (pb.HeartbeatMessage) {
     // Generate array of pointers to each membership list entry
-    membershipArray := make([]*pb.TableEntry, 0, len(membershipList))
-    for _, value := range membershipList {
+    membershipArray := make([]*pb.TableEntry, 0, len(MembershipList))
+    for _, value := range MembershipList {
         copiedValue := value
         membershipArray = append(membershipArray, &copiedValue)
     }
@@ -237,7 +241,7 @@ func cleanupTable() {
     lock.Lock()
     defer lock.Unlock()
 
-    for key, value := range membershipList {
+    for key, value := range MembershipList {
         // Skip entry referring to current node
         if key == thisMachineId {
             continue
@@ -246,13 +250,13 @@ func cleanupTable() {
         if time.Now().UnixMilli() - value.LocalTime >= T_FAIL {
             // Delete the node from membership list and add to dead members
             deadMembers[key] = value.LocalTime
-            delete(membershipList, key)
+            delete(MembershipList, key)
             go thisDeleteCallback(key)
         }
     }
 }
 
-func Join(machineId string, hostname string, port string, introducer string, addCallback func(string), deleteCallback func(string)) {
+func Join(machineId string, hostname string, port string, introducer string, addCallback func(string, string), deleteCallback func(string)) {
     // Initialize node state variables
     thisHostname = hostname
     thisPort = port
@@ -263,14 +267,14 @@ func Join(machineId string, hostname string, port string, introducer string, add
     fmt.Println("Joining Node Info:", thisMachineId, thisHostname, thisPort, introducer)
 
     // Add node to membership list
-    membershipList[thisMachineId] = pb.TableEntry {
+    MembershipList[thisMachineId] = pb.TableEntry {
         MachineId: thisMachineId,
         HeartbeatCounter: 0,
         Hostname: thisHostname,
         Port: thisPort,
         LocalTime: time.Now().UnixMilli(),
-    }
-
+		TcpPort: fs.Tcp_port, // added for MP3 gRPC stuff
+    };
     // Introduce node to known node
     if introducer != "" {
         sendHeartbeatAddress(introducer)

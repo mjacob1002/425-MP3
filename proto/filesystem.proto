@@ -1,20 +1,20 @@
 syntax="proto3";
-option go_package = "../pkg/gen_proto";
+option go_package = "../pkg/filesystem";
 
 service FileSystem {
-	rpc Get(GetRequest) returns (stream GetResponse);
-	rpc Put(stream PutRequest) returns (PutResponse);
-	rpc Delete(DeleteRequest) returns (DeleteResponse);
+	rpc Get(GetRequest) returns (stream GetResponse) {}
+	rpc Put(stream PutRequest) returns (PutResponse) {}
+	rpc Delete(DeleteRequest) returns (DeleteResponse) {}
 }
 
 message GetRequest {
-	string payload = 1;
 	string sdfs_name = 2;
 	string local_name = 3;
 }
 
 message GetResponse{
-	int64 err = 1;
+	string payload = 1;
+	int64 err = 2;
 }
 
 message PutRequest {
