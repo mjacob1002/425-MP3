@@ -149,7 +149,7 @@ func Get(targetStub FileSystemClient, sdfsname string, localfname string){
 		}
 }
 func InitializeFileSystem(){
-		TempDirectory, _ = os.MkdirTemp("", "LOL");
+		TempDirectory, _ = os.MkdirTemp(".", "LOL");
 		InitializeGRPCServer();
 }
 
