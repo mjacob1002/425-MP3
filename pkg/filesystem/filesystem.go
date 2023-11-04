@@ -104,8 +104,22 @@ func Put(targetStub FileSystemClient, localfname string, sdfsname string){
 	fmt.Printf("Response to PUT: %s\n", response.String());
 }
 
+func Delete(targetStub FileSystemClient, remotefname string){
+	deletemsg := DeleteRequest{SdfsName: remotefname}
+	resp, err := targetStub.Delete(context.Background(), &deletemsg);
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Delete response: %s\n", resp.String());
+}
+
 func (s *Server) Delete(ctx context.Context, in *DeleteRequest) (*DeleteResponse, error) {
 		fmt.Println("Got invoked Delete by ", in.SdfsName);
+		fname := filepath.Join(TempDirectory, in.SdfsName);
+		err := os.Remove(fname);
+		if err != nil {
+			log.Fatal(err);
+		}
 		return &DeleteResponse{}, nil;
 }
 
