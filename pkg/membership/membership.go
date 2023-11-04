@@ -56,7 +56,7 @@ func processHeartbeat(heartbeat *pb.HeartbeatMessage) {
             newEntry.Hostname = entry.Hostname
             newEntry.Port = entry.Port
             newEntry.LocalTime = time.Now().UnixMilli()
-			newEntry.TcpPort= fs.Tcp_port // new for MP3
+			newEntry.TcpPort= entry.TcpPort// new for MP3
             MembershipList[newEntry.MachineId] = newEntry
 			fmt.Printf("Just received new entry of %s\n", newEntry.String())
 			serverAddress := fmt.Sprintf("%s:%d", newEntry.Hostname,newEntry.TcpPort)
@@ -274,8 +274,7 @@ func Join(machineId string, hostname string, port string, introducer string, add
         Port: thisPort,
         LocalTime: time.Now().UnixMilli(),
 		TcpPort: fs.Tcp_port, // added for MP3 gRPC stuff
-    }
-
+    };
     // Introduce node to known node
     if introducer != "" {
         sendHeartbeatAddress(introducer)
