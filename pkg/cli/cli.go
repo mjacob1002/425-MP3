@@ -14,13 +14,15 @@ func ListenToCommands(){
     putRe := regexp.MustCompile(`^put (\S+) (\S+)\n$`)
     getRe := regexp.MustCompile(`^get (\S+) (\S+)\n$`)
     deleteRe := regexp.MustCompile(`^delete (\S+)\n$`)
+    listMemRe := regexp.MustCompile(`^list_mem\n$`)
 
     reader := bufio.NewReader(os.Stdin)
     for {
         // Read input
         input, _ := reader.ReadString('\n')
 
-        if putRe.MatchString(input) {
+        switch {
+        case putRe.MatchString(input):
             matches := putRe.FindStringSubmatch(input)
             if len(matches) == 3 {
                 localFilename := matches[1]
@@ -28,20 +30,24 @@ func ListenToCommands(){
                 index := fs.GetFileOwner(sdfsFilename)
                 fs.Put(fs.MachineStubs[fs.MachineIds[index]], localFilename, sdfsFilename, false)
             }
-        } else if getRe.MatchString(input) {
+        case getRe.MatchString(input):
             matches := getRe.FindStringSubmatch(input)
             if len(matches) == 3 {
                 sdfsFilename := matches[1]
                 localFilename := matches[2]
                 fmt.Printf("localFilename: <%v>, sdfsFilename: <%v>\n", localFilename, sdfsFilename)
             }     
-        } else if deleteRe.MatchString(input) {
+        case deleteRe.MatchString(input):
             matches := deleteRe.FindStringSubmatch(input)
             if len(matches) == 2 {
                 sdfsFilename := matches[1]
                 fmt.Printf("sdfsFilename: <%v>\n", sdfsFilename)
-            }     
-        } else {
+            }
+        case listMemRe.MatchString(input):
+            for i, machineId := range fs.MachineIds {
+                fmt.Printf("%v. %v\n", i + 1, machineId)
+            }
+        default:
             fmt.Printf("Could not recoginize command\n")
         }
     }
