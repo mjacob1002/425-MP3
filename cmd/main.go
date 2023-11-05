@@ -44,6 +44,7 @@ func onAdd(machineId string, serverAddress string) {
         // We need to copy files around to ensure we have 3 replicas of files
         sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 0) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + 1) % len(fs.MachineIds)])
         for _, sdfsFilename := range sdfsFilenames {
+            fmt.Printf("fs.Put with args <%v> <%v> <%v>\n", machineId, filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename)
             fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, true)
         }
     } else if (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
