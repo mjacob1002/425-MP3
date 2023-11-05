@@ -46,8 +46,8 @@ func onAdd(machineId string, serverAddress string) {
 func onDelete(machineId string) {
     fmt.Println("Deleting node from membership list:", machineId)
 
-    MachineIdsLock.Lock()
-    defer MachineIdsLock.Unlock()
+    fs.MachineIdsLock.Lock()
+    defer fs.MachineIdsLock.Unlock()
 
     hasher := fnv.New32a()
 
