@@ -304,7 +304,7 @@ func FileRangeHash(start uint32, end uint32) []string {
         fileHash := hasher.Sum32()
         hasher.Reset()
 
-        if (start < end && start <= fileHash && fileHash < end) || (end < start && (start <= fileHash || fileHash < end)) {
+        if (start < end && start <= fileHash && fileHash < end) || (end <= start && (start <= fileHash || fileHash < end)) {
             sdfsNames = append(sdfsNames, file)
         }
     }
