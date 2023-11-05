@@ -305,6 +305,8 @@ func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRang
         }
     }
 
+    fmt.Println("returning %v\n", sdfsNames)
+
     return &(FileRangeResponse{ SdfsNames: sdfsNames }), nil
 }
 
