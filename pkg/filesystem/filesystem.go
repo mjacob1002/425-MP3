@@ -18,6 +18,7 @@ import (
 var TempDirectory string
 // stores the stubs used for gRPC methods
 var MachineStubs map[string] FileSystemClient = make(map[string]FileSystemClient)
+var MachineIdsLock sync.Mutex
 var MachineIds []string = []string{}
 var ThisMachineIdIdx int
 
