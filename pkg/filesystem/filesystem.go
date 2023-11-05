@@ -204,7 +204,7 @@ func Delete(targetStub FileSystemClient, sdfsFilename string, replica bool) erro
     return nil
 }
 
-func remove(slice []string, element string) []string {
+func Remove(slice []string, element string) []string {
     newSlice := []string{}
     for _, s := range slice {
         if s != element {
@@ -223,7 +223,7 @@ func (s *Server) Delete(ctx context.Context, in *DeleteRequest) (*emptypb.Empty,
     }
 
     // Remove filename from local file list
-    Files = remove(Files, sdfsFilename)
+    Files = Remove(Files, sdfsFilename)
 
     if !replica {
         // Tell other machines to delete file as a replica
@@ -276,6 +276,26 @@ func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string)
 }
 
 func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRangeResponse, error) {
+    sdfsNames := FileRangeHash(in.Start, in.End)
+
+    return &(FileRangeResponse{ SdfsNames: sdfsNames }), nil
+}
+
+func FileRangeNodes(start string, end string) []string {
+    hasher := fnv.New32a()
+
+    hasher.Write([]byte(start))
+    startHash := hasher.Sum32()
+    hasher.Reset()
+    
+    hasher.Write([]byte(end))
+    endHash := hasher.Sum32()
+    hasher.Reset()
+
+    return FileRangeHash(startHash, endHash)
+}
+
+func FileRangeHash(start uint32, end uint32) []string {
     hasher := fnv.New32a()
     var sdfsNames []string
 
@@ -284,12 +304,12 @@ func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRang
         fileHash := hasher.Sum32()
         hasher.Reset()
 
-        if (in.Start < in.End && in.Start <= fileHash && fileHash < in.End) || (in.End < in.Start && (in.Start <= fileHash || fileHash < in.End)) {
+        if (start < end && start <= fileHash && fileHash < end) || (end < start && (start <= fileHash || fileHash < end)) {
             sdfsNames = append(sdfsNames, file)
         }
     }
 
-    return &(FileRangeResponse{ SdfsNames: sdfsNames }), nil
+    return sdfsNames
 }
 
 func FileRange(targetStub FileSystemClient, start uint32, end uint32) ([]string, error) {

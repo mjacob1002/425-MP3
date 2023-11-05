@@ -8,6 +8,7 @@ import (
     "sort"
     "hash/fnv"
     "path/filepath"
+    "os"
     membership "github.com/mjacob1002/425-MP3/pkg/membership"
     "github.com/mjacob1002/425-MP3/pkg/cli"
 	fs "github.com/mjacob1002/425-MP3/pkg/filesystem"
@@ -18,6 +19,9 @@ var thisMachineId string
 
 func onAdd(machineId string, serverAddress string) {
     fmt.Println("Adding new node to membership list:", machineId)
+
+    fs.MachineIdsLock.Lock()
+    defer fs.MachineIdsLock.Unlock()
 
     hasher := fnv.New32a()
 
@@ -34,13 +38,36 @@ func onAdd(machineId string, serverAddress string) {
 		return machineIdsIHash >= machineIdHash
 	})
 
+    fs.InitializeGRPCConnection(machineId, serverAddress)
+
+    if len(fs.MachineIds) < 4 || (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds) <= 4  {
+        // We need to copy files around to ensure we have 3 replicas of files
+        sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)], fs.MachineIds[fs.ThisMachineIdIdx])
+        for _, sdfsFilename := range sdfsFilenames {
+            fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, false)
+        }
+    } else if (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
+        sdfsFilenames := fs.FileRangeNodes(
+            fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)],
+            fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)],
+        )
+
+        for _, sdfsFilename := range sdfsFilenames {
+            filename := filepath.Join(fs.TempDirectory, sdfsFilename)
+            if err := os.Remove(filename); err != nil {
+                fmt.Printf(fmt.Errorf("os.Remove: %v\n", err).Error())
+            }
+
+            // Remove filename from local file list
+            fs.Files = fs.Remove(fs.Files, sdfsFilename)
+        }
+    }
+
     // Append new machine id to list
 	fs.MachineIds = append(fs.MachineIds[:index], append([]string{machineId}, fs.MachineIds[index:]...)...)
     if index <= fs.ThisMachineIdIdx {
         fs.ThisMachineIdIdx++
     }
-
-    fs.InitializeGRPCConnection(machineId, serverAddress)
 }
 
 func onDelete(machineId string) {
