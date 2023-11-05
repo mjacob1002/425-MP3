@@ -60,7 +60,7 @@ func onDelete(machineId string) {
 		return machineIdsIHash >= machineIdHash
 	})
 
-    if (fs.ThisMachineIdIdx - 1) % len(fs.MachineIds) == index {
+    if fs.ThisMachineIdIdx == (index + 1) % len(fs.MachineIds) {
         hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)]))
         start := hasher.Sum32()
         hasher.Reset()
