@@ -12,6 +12,7 @@ import (
     "sort"
     "hash/fnv"
     "google.golang.org/protobuf/types/known/emptypb"
+    "time"
 )
 
 var TempDirectory string
@@ -158,7 +159,10 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
         return err
     }
 
-    stream, err := targetStub.Put(context.Background())
+    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+    defer cancel()
+
+    stream, err := targetStub.Put(contextWithTimeout)
     if err != nil {
         fmt.Errorf("targetStub.Put: %v\n", err)
         return err
@@ -189,8 +193,11 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
 }
 
 func Delete(targetStub FileSystemClient, sdfsFilename string, replica bool) error {
+    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+    defer cancel()
+
     request := DeleteRequest{ SdfsName: sdfsFilename, Replica: replica }
-    _, err := targetStub.Delete(context.Background(), &request)
+    _, err := targetStub.Delete(contextWithTimeout, &request)
     if err != nil {
         fmt.Errorf("targetStub.Read: %v\n", err)
         return err
@@ -248,7 +255,11 @@ func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string)
         fmt.Println(err)
     }
     defer file.Close()
-    stream, err := targetStub.Get(context.Background(), &request)
+
+    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+    defer cancel()
+
+    stream, err := targetStub.Get(contextWithTimeout, &request)
     if err != nil {
         log.Fatal(err)
         return err
@@ -300,7 +311,10 @@ func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRang
 func FileRange(targetStub FileSystemClient, start uint32, end uint32) ([]string, error) {
     request := &FileRangeRequest{ Start: start, End: end }
 
-    response, err := targetStub.FileRange(context.Background(), request)
+    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+    defer cancel()
+
+    response, err := targetStub.FileRange(contextWithTimeout, request)
     if err != nil {
         fmt.Errorf("client.FileRange: %v", err)
         return nil, err
