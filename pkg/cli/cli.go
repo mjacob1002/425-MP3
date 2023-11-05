@@ -64,13 +64,7 @@ func ListenToCommands(){
                 }
             }
         case storeRe.MatchString(input):
-            fmt.Printf("Files:\n")
             for i, file := range fs.Files {
-                fmt.Printf("%v. %v\n", i + 1, file)
-            }
-
-            fmt.Printf("Replicated Files:\n")
-            for i, file := range fs.ReplicaFiles {
                 fmt.Printf("%v. %v\n", i + 1, file)
             }
         case listMemRe.MatchString(input):

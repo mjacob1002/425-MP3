@@ -75,15 +75,15 @@ func onDelete(machineId string) {
             hasher.Reset()
 
             fmt.Printf("trying with offset of %v\n", offset)
-            newReplicaFiles, err := fs.FileRange(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset) % len(fs.MachineIds)]], start, end)
+            newFiles, err := fs.FileRange(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset) % len(fs.MachineIds)]], start, end)
             if err == nil {
-                fmt.Printf("newReplicaFiles (offset of %v): %v\n", offset, newReplicaFiles)
-                for _, newReplicaFile := range newReplicaFiles {
-                    err := fs.Get(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset) % len(fs.MachineIds)]], newReplicaFile, filepath.Join(fs.TempDirectory, newReplicaFile)) 
+                fmt.Printf("newFiles (offset of %v): %v\n", offset, newFiles)
+                for _, newFile := range newFiles {
+                    err := fs.Get(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset) % len(fs.MachineIds)]], newFile, filepath.Join(fs.TempDirectory, newFile)) 
                     if err != nil {
                         fmt.Printf("fs.Get: %v\n", err)
                     } else {
-                        fs.ReplicaFiles = append(fs.ReplicaFiles, newReplicaFile)
+                        fs.Files = append(fs.Files, newFile)
                     }
                 }
                 break
@@ -92,12 +92,6 @@ func onDelete(machineId string) {
             }
         }
     }
-
-    // TODO: If we are at the next node, move the replica files to the main files list
-    // newReplicaFilesList := []string{}
-    // for _, replicaFile := range ReplicaFiles  {
-        
-    // }
 
     // Remove old machine id to list
     fs.MachineIds = append(fs.MachineIds[:index], fs.MachineIds[index+1:]...)
