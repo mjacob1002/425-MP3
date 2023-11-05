@@ -9,24 +9,23 @@ import (
     "hash/fnv"
     membership "github.com/mjacob1002/425-MP3/pkg/membership"
     "github.com/mjacob1002/425-MP3/pkg/cli"
-	"google.golang.org/grpc"
-	//"golang.org/x/net/context"
 	fs "github.com/mjacob1002/425-MP3/pkg/filesystem"
 )
 
 var thisMachineName string
 var thisMachineId string
 
-
 func onAdd(machineId string, serverAddress string) {
     fmt.Println("Adding new node to membership list:", machineId)
 
     hasher := fnv.New32a()
 
+    // Calculate new machine's id's hash
     hasher.Write([]byte(machineId))
     machineIdHash := hasher.Sum32()
     hasher.Reset()
 
+    // Search for new location of the new machine id
     index := sort.Search(len(fs.MachineIds), func(i int) bool {
         hasher.Write([]byte(fs.MachineIds[i]))
         machineIdsIHash := hasher.Sum32()
@@ -34,23 +33,13 @@ func onAdd(machineId string, serverAddress string) {
 		return machineIdsIHash >= machineIdHash
 	})
 
+    // Append new machine id to list
 	fs.MachineIds = append(fs.MachineIds[:index], append([]string{machineId}, fs.MachineIds[index:]...)...)
-    if index <= fs.MachineIdsIdx {
-        fs.MachineIdsIdx++
+    if index <= fs.ThisMachineIdIdx {
+        fs.ThisMachineIdIdx++
     }
-	fmt.Println("Trying to connect to ", serverAddress);
-	conn, err := grpc.Dial(serverAddress, grpc.WithInsecure())
-	if err != nil {
-		fmt.Println(err);
-	}
-	if conn == nil {
-		fmt.Println("What the fuck - why is this shit dead.");
-	}
-	client := fs.NewFileSystemClient(conn)
-	// we should lock the machineStubs map
-	fs.MachineStubs[machineId] = client;
-	// unlock mutex
-	fmt.Println("Just added the following's gRPC stuff: ", machineId, " with clientStub of ", fs.MachineStubs[machineId], " but client is ", client);
+
+    fs.InitializeGRPCConnection(machineId, serverAddress)
 }
 
 func onDelete(machineId string) {
@@ -58,10 +47,12 @@ func onDelete(machineId string) {
 
     hasher := fnv.New32a()
 
+    // Calculate old machine's id's hash
     hasher.Write([]byte(machineId))
     machineIdHash := hasher.Sum32()
     hasher.Reset()
 
+    // Search for location of the old machine id
     index := sort.Search(len(fs.MachineIds), func(i int) bool {
         hasher.Write([]byte(fs.MachineIds[i]))
         machineIdsIHash := hasher.Sum32()
@@ -69,32 +60,40 @@ func onDelete(machineId string) {
 		return machineIdsIHash >= machineIdHash
 	})
 
+    // Remove old machine id to list
     fs.MachineIds = append(fs.MachineIds[:index], fs.MachineIds[index+1:]...)
-    if index <= fs.MachineIdsIdx {
-        fs.MachineIdsIdx--
+    if index <= fs.ThisMachineIdIdx {
+        fs.ThisMachineIdIdx--
     }
+
+    // Delete old connection from stubs map
+    delete(fs.MachineStubs, machineId)
 }
 
 func main() {
     // Collect arguments
-    var hostname, port, introducer string
+    var hostname, port, introducer, applicationPort string
     flag.StringVar(&thisMachineName, "machine_name", "", "Machine Name")
     flag.StringVar(&hostname, "hostname", "", "Hostname")
     flag.StringVar(&port, "port", "", "Port")
     flag.StringVar(&introducer, "introducer", "", "Introducer Node Address")
-	flag.Int64Var(&fs.Tcp_port, "tcp_port", 9999, "The port where gRPC will be listening for incoming requests")
+	flag.StringVar(&applicationPort, "application_port", "", "Application level port")
     flag.Parse()
 
     thisMachineId = (thisMachineName + "_" + strconv.FormatInt(time.Now().UnixMilli(), 10))
     fs.MachineIds = append(fs.MachineIds, thisMachineId)
-    fs.MachineIdsIdx = 0
-	fmt.Printf("I am using tcp_port %d\n", fs.Tcp_port);
-	go fs.InitializeFileSystem()
+    fs.ThisMachineIdIdx = 0
+
+    // Generate TCP connection to itself
+    fs.InitializeGRPCConnection(thisMachineId, hostname + ":" + applicationPort)
+
+	go fs.InitializeFileSystem(applicationPort)
 	go membership.Join(
         thisMachineId,
         hostname,
         port,
         introducer,
+        applicationPort,
         onAdd,
         onDelete,
     )
@@ -102,3 +101,4 @@ func main() {
 
 	select {}
 }
+

@@ -10,7 +10,6 @@ import (
 
     "google.golang.org/protobuf/proto"
     pb "github.com/mjacob1002/425-MP3/pkg/gen_proto"
-	fs "github.com/mjacob1002/425-MP3/pkg/filesystem"
 )
 
 // Define node state variables
@@ -56,10 +55,9 @@ func processHeartbeat(heartbeat *pb.HeartbeatMessage) {
             newEntry.Hostname = entry.Hostname
             newEntry.Port = entry.Port
             newEntry.LocalTime = time.Now().UnixMilli()
-			newEntry.TcpPort= entry.TcpPort// new for MP3
+			newEntry.ApplicationPort= entry.ApplicationPort
             MembershipList[newEntry.MachineId] = newEntry
-			fmt.Printf("Just received new entry of %s\n", newEntry.String())
-			serverAddress := fmt.Sprintf("%s:%d", newEntry.Hostname,newEntry.TcpPort)
+            serverAddress := newEntry.Hostname + ":" + newEntry.ApplicationPort
             go thisAddCallback(entry.MachineId, serverAddress)
         } else if entry.HeartbeatCounter > MembershipList[entry.MachineId].HeartbeatCounter {
             // Update pre-existing entry to higher heartbeat count
@@ -216,7 +214,7 @@ func sendHeartbeatAddress(address string){
     }
 
     conn, err := net.DialUDP("udp", nil, udpAddr)
-    if err != nil{
+    if err != nil {
         fmt.Errorf("net.DialUDP: %v\n", err)
         return
     }
@@ -225,14 +223,14 @@ func sendHeartbeatAddress(address string){
     // Create the hearbeat
     heartbeat := makeHeartbeatFromMembershipList()
     serializedHeartbeat, err := proto.Marshal(&heartbeat)
-    if err != nil{
+    if err != nil {
         fmt.Errorf("proto.Marshal: %v\n", err)
         return
     }
 
     // Write serialized heartbeat to connection
     _, err = conn.Write(serializedHeartbeat)
-    if err != nil{
+    if err != nil {
         fmt.Errorf("conn.Write: %v\n", err)
     }
 }
@@ -256,7 +254,7 @@ func cleanupTable() {
     }
 }
 
-func Join(machineId string, hostname string, port string, introducer string, addCallback func(string, string), deleteCallback func(string)) {
+func Join(machineId string, hostname string, port string, introducer string, applicationPort string, addCallback func(string, string), deleteCallback func(string)) {
     // Initialize node state variables
     thisHostname = hostname
     thisPort = port
@@ -273,8 +271,9 @@ func Join(machineId string, hostname string, port string, introducer string, add
         Hostname: thisHostname,
         Port: thisPort,
         LocalTime: time.Now().UnixMilli(),
-		TcpPort: fs.Tcp_port, // added for MP3 gRPC stuff
-    };
+		ApplicationPort: applicationPort,
+    }
+
     // Introduce node to known node
     if introducer != "" {
         sendHeartbeatAddress(introducer)

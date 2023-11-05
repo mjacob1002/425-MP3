@@ -6,7 +6,7 @@ message TableEntry {
     int32 heartbeat_counter = 2;
     string hostname = 4;
     string port = 5;
-	int64 tcp_port = 6; // field added for gRPC and file transfer
+	string application_port = 6;
     int64 local_time = 3;
 }
 
