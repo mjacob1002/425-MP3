@@ -61,7 +61,7 @@ func onDelete(machineId string) {
 		return machineIdsIHash >= machineIdHash
 	})
 
-    if len(fs.MachineIds) > 4 && (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
+    if len(fs.MachineIds) > 4 && (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) <= 4  {
         // We need to copy files around to ensure we have 3 replicas of files
 
         // Check all 4 machines that occur previously in the ring
