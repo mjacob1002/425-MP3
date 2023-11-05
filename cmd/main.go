@@ -42,7 +42,7 @@ func onAdd(machineId string, serverAddress string) {
 
     if len(fs.MachineIds) < 4 || (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds) <= 4  {
         // We need to copy files around to ensure we have 3 replicas of files
-        sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)], fs.MachineIds[fs.ThisMachineIdIdx])
+        sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 0) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + 1) % len(fs.MachineIds)])
         for _, sdfsFilename := range sdfsFilenames {
             fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, false)
         }
