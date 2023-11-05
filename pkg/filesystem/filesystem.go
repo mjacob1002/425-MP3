@@ -71,34 +71,36 @@ func (s *Server) Put(stream FileSystem_PutServer) error {
 				}
 				file = tempvar
                 replica = req.Replica
+                sdfsname = req.SdfsName
 			}
 			file.Write([]byte(req.PayloadToWrite));
 		}
 		file.Close()
-		fmt.Println("just wrote to the file in %s\n", TempDirectory)
+		fmt.Printf("just wrote to the file in %v\n", TempDirectory)
         if !replica {
             // send out to other machines
             for i := 1; i < 4; i++ {
                 idx := (i + MachineIdsIdx) % len(MachineIds)
+                fmt.Printf("should be sending out %v to index %v: %v\n", sdfsname, idx, MachineIds[idx])
                 if idx == MachineIdsIdx {
                     break
                 }
                 // send to machine at idx
-                Put(MachineStubs[MachineIds[idx]], fname, sdfsname)
+                Put(MachineStubs[MachineIds[idx]], fname, sdfsname, true)
             }
         }
 		return stream.SendAndClose(&PutResponse{Err: 0});
 }
 
-func Put(targetStub FileSystemClient, localfname string, sdfsname string){
+func Put(targetStub FileSystemClient, localfname string, sdfsname string, replica bool){
 	// do we have to do mutex shit here? Not sure. We don't need to do any struct stuff here
 	file, err := os.Open(localfname)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("os.Open:", err)
 	}
 	stream, err := targetStub.Put(context.Background())
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("targetStub.Put:", err)
 	}
 	for {
 			buffer := make([]byte, 4096)
@@ -109,7 +111,7 @@ func Put(targetStub FileSystemClient, localfname string, sdfsname string){
 			if err != nil {
 				log.Fatal(err)
 			}
-			req := PutRequest{PayloadToWrite: string(buffer[:bytesRead]), LocalName: localfname, SdfsName: sdfsname}
+			req := PutRequest{PayloadToWrite: string(buffer[:bytesRead]), LocalName: localfname, SdfsName: sdfsname, Replica: replica}
 			stream.Send(&req); // send stuff over the network
 	}
 	response, err := stream.CloseAndRecv() // close and receive
