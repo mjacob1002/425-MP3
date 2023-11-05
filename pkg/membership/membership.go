@@ -73,13 +73,13 @@ func listenInitializer() {
     // Initialize socket
     udpAddress, err := net.ResolveUDPAddr("udp", ":" + thisPort)
     if err != nil {
-        fmt.Printf(fmt.Errorf("net.ResolveUDPAddr: %v\n", err))
+        fmt.Printf(fmt.Errorf("net.ResolveUDPAddr: %v\n", err).Error())
         os.Exit(1)
     }
 
     conn, err := net.ListenUDP("udp", udpAddress)
     if err != nil {
-        fmt.Printf(fmt.Errorf("net.ListenUDP: %v\n", err))
+        fmt.Printf(fmt.Errorf("net.ListenUDP: %v\n", err).Error())
         os.Exit(1)
     }
     defer conn.Close()
@@ -89,13 +89,13 @@ func listenInitializer() {
         // Read packets
         n, _, err := conn.ReadFromUDP(buffer)
         if err != nil {
-            fmt.Printf(fmt.Errorf("conn.ReadFromUDP: %v\n", err))
+            fmt.Printf(fmt.Errorf("conn.ReadFromUDP: %v\n", err).Error())
         }
 
         // Parse protobuf messages
         message := &pb.HeartbeatMessage{}
         if err := proto.Unmarshal(buffer[0:n], message); err != nil {
-            fmt.Printf(fmt.Errorf("proto.Unmarshal: %v\n", err))
+            fmt.Printf(fmt.Errorf("proto.Unmarshal: %v\n", err).Error())
             continue
         }
 
@@ -111,7 +111,7 @@ func incrementHeartbeat(){
     // Update heartbeat counter for this node in membership list
     entry, ok := MembershipList[thisMachineId];
     if !ok {
-        fmt.Printf(fmt.Errorf("Node does not exist in its own membership list\n"))
+        fmt.Printf(fmt.Errorf("Node does not exist in its own membership list\n").Error())
         os.Exit(1)
     }
     entry.HeartbeatCounter = entry.HeartbeatCounter + 1
@@ -209,13 +209,13 @@ func sendHeartbeatAddress(address string){
     // Setup connection
     udpAddr, err := resolveUDPAddress(address)
     if err != nil {
-        fmt.Printf(fmt.Errorf("resolveUDPAddress: \n", err))
+        fmt.Printf(fmt.Errorf("resolveUDPAddress: \n", err).Error())
         os.Exit(1)
     }
 
     conn, err := net.DialUDP("udp", nil, udpAddr)
     if err != nil {
-        fmt.Printf(fmt.Errorf("net.DialUDP: %v\n", err))
+        fmt.Printf(fmt.Errorf("net.DialUDP: %v\n", err).Error())
         return
     }
     defer conn.Close()
@@ -224,14 +224,14 @@ func sendHeartbeatAddress(address string){
     heartbeat := makeHeartbeatFromMembershipList()
     serializedHeartbeat, err := proto.Marshal(&heartbeat)
     if err != nil {
-        fmt.Printf(fmt.Errorf("proto.Marshal: %v\n", err))
+        fmt.Printf(fmt.Errorf("proto.Marshal: %v\n", err).Error())
         return
     }
 
     // Write serialized heartbeat to connection
     _, err = conn.Write(serializedHeartbeat)
     if err != nil {
-        fmt.Printf(fmt.Errorf("conn.Write: %v\n", err))
+        fmt.Printf(fmt.Errorf("conn.Write: %v\n", err).Error())
     }
 }
 

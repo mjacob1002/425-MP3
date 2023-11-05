@@ -50,7 +50,7 @@ func InitializeGRPCConnection(machineId string, serverAddress string) {
     // Establish TCP connection with new node
 	conn, err := grpc.Dial(serverAddress, grpc.WithInsecure())
 	if err != nil {
-        fmt.Printf(fmt.Errorf("grpc.Dial: %v\n", err))
+        fmt.Printf(fmt.Errorf("grpc.Dial: %v\n", err).Error())
 	}
 
 	client := NewFileSystemClient(conn)
@@ -62,7 +62,7 @@ func (s *Server) Get(in *GetRequest, stream FileSystem_GetServer) error {
     filename := filepath.Join(TempDirectory, in.SdfsName)
     file, err := os.Open(filename)
     if err != nil {
-        fmt.Printf(fmt.Errorf("os.Open: %v\n", err))
+        fmt.Printf(fmt.Errorf("os.Open: %v\n", err).Error())
         return err
     }
 
@@ -74,7 +74,7 @@ func (s *Server) Get(in *GetRequest, stream FileSystem_GetServer) error {
         if err == io.EOF {
             break
         } else if err != nil {
-            fmt.Printf(fmt.Errorf("file.Read: %v\n", err))
+            fmt.Printf(fmt.Errorf("file.Read: %v\n", err).Error())
             return err
         }
 
@@ -104,7 +104,7 @@ func (s *Server) Put(stream FileSystem_PutServer) error {
         if err == io.EOF {
             break
         } else if err != nil {
-            fmt.Printf(fmt.Errorf("stream.Recv: %v\n", err))
+            fmt.Printf(fmt.Errorf("stream.Recv: %v\n", err).Error())
             return err
         }
 
@@ -116,7 +116,7 @@ func (s *Server) Put(stream FileSystem_PutServer) error {
             file, err = os.Create(filename)
 
             if err != nil {
-                fmt.Printf(fmt.Errorf("os.Create: %v\n", err))
+                fmt.Printf(fmt.Errorf("os.Create: %v\n", err).Error())
                 return err
             }
 
@@ -140,7 +140,7 @@ func (s *Server) Put(stream FileSystem_PutServer) error {
             }
  
             if err := Put(MachineStubs[MachineIds[idx]], filename, sdfsFilename, true); err != nil {
-                fmt.Printf(fmt.Errorf("Put: %v\n", err))
+                fmt.Printf(fmt.Errorf("Put: %v\n", err).Error())
             }
         }
     }
@@ -152,7 +152,7 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
     // Open file
     file, err := os.Open(localFilename)
     if err != nil {
-        fmt.Printf(fmt.Errorf("os.Open: %v\n", err))
+        fmt.Printf(fmt.Errorf("os.Open: %v\n", err).Error())
         return err
     }
 
@@ -161,7 +161,7 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
 
     stream, err := targetStub.Put(contextWithTimeout)
     if err != nil {
-        fmt.Printf(fmt.Errorf("targetStub.Put: %v\n", err))
+        fmt.Printf(fmt.Errorf("targetStub.Put: %v\n", err).Error())
         return err
     }
 
@@ -173,7 +173,7 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
         if err == io.EOF {
             break
         } else if err != nil {
-            fmt.Printf(fmt.Errorf("file.Read: %v\n", err))
+            fmt.Printf(fmt.Errorf("file.Read: %v\n", err).Error())
         }
 
         req := PutRequest{ PayloadToWrite: string(buffer[:bytesRead]), SdfsName: sdfsFilename, Replica: replica }
@@ -182,7 +182,7 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
 
     // Close stream and receive
     if _, err = stream.CloseAndRecv(); err != nil {
-        fmt.Printf(fmt.Errorf("stream.CloseAndRecv: %v\n", err))
+        fmt.Printf(fmt.Errorf("stream.CloseAndRecv: %v\n", err).Error())
         return err
     }
 
@@ -196,7 +196,7 @@ func Delete(targetStub FileSystemClient, sdfsFilename string, replica bool) erro
     request := DeleteRequest{ SdfsName: sdfsFilename, Replica: replica }
     _, err := targetStub.Delete(contextWithTimeout, &request)
     if err != nil {
-        fmt.Printf(fmt.Errorf("targetStub.Read: %v\n", err))
+        fmt.Printf(fmt.Errorf("targetStub.Read: %v\n", err).Error())
         return err
     }
 
@@ -217,7 +217,7 @@ func (s *Server) Delete(ctx context.Context, in *DeleteRequest) (*emptypb.Empty,
     sdfsFilename, replica := in.SdfsName, in.Replica
     filename := filepath.Join(TempDirectory, sdfsFilename) 
     if err := os.Remove(filename); err != nil {
-        fmt.Printf(fmt.Errorf("os.Remove: %v\n", err))
+        fmt.Printf(fmt.Errorf("os.Remove: %v\n", err).Error())
         return nil, err
     }
 
@@ -299,7 +299,7 @@ func FileRange(targetStub FileSystemClient, start uint32, end uint32) ([]string,
 
     response, err := targetStub.FileRange(contextWithTimeout, request)
     if err != nil {
-        fmt.Printf(fmt.Errorf("client.FileRange: %v", err))
+        fmt.Printf(fmt.Errorf("client.FileRange: %v", err).Error())
         return nil, err
     }
 
@@ -314,7 +314,7 @@ func InitializeFileSystem(port string) {
 func InitializeGRPCServer(port string) {
     lis, err := net.Listen("tcp", ":" + port)
     if err != nil {
-        fmt.Printf(fmt.Errorf("net.Listen: %v\n", err))
+        fmt.Printf(fmt.Errorf("net.Listen: %v\n", err).Error())
         os.Exit(1)
     }
 
