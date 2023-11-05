@@ -251,6 +251,45 @@ func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string)
     }
 }
 
+func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRangeResponse, error) {
+    hasher := fnv.New32a()
+    var sdfsNames []string
+
+    for _, file := range Files {
+        hasher.Write([]byte(file))
+        fileHash := hasher.Sum32()
+        hasher.Reset()
+
+        if in.Start <= fileHash && fileHash < in.End {
+            sdfsNames = append(sdfsNames, file)
+        }
+    }
+
+    for _, file := range ReplicaFiles {
+        hasher.Write([]byte(file))
+        fileHash := hasher.Sum32()
+        hasher.Reset()
+
+        if in.Start <= fileHash && fileHash < in.End {
+            sdfsNames = append(sdfsNames, file)
+        }
+    }
+
+    return &(FileRangeResponse{ SdfsNames: sdfsNames }), nil
+}
+
+func FileRange(targetStub FileSystemClient, start uint32, end uint32) []string {
+    request := &FileRangeRequest{ Start: start, End: end }
+
+    response, err := targetStub.FileRange(context.Background(), request)
+    if err != nil {
+        fmt.Errorf("client.FileRange: %v", err)
+        return []string{}
+    }
+
+    return response.SdfsNames
+}
+
 func InitializeFileSystem(port string) {
     TempDirectory, _ = os.MkdirTemp(".", "tmp")
     InitializeGRPCServer(port)

@@ -5,6 +5,7 @@ service FileSystem {
 	rpc Get(GetRequest) returns (stream GetResponse) {}
 	rpc Put(stream PutRequest) returns (PutResponse) {}
 	rpc Delete(DeleteRequest) returns (DeleteResponse) {}
+	rpc FileRange(FileRangeRequest) returns (FileRangeResponse) {}
 }
 
 message GetRequest {
@@ -33,5 +34,14 @@ message DeleteRequest {
 
 message DeleteResponse {
 	int64 err = 1;
+}
+
+message FileRangeRequest {
+	uint32 start = 1;
+    uint32 end = 2;
+}
+
+message FileRangeResponse {
+    repeated string sdfs_names = 1;
 }
 
