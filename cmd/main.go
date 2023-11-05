@@ -77,10 +77,8 @@ func onDelete(machineId string) {
             end := hasher.Sum32()
             hasher.Reset()
 
-            fmt.Printf("trying with offset of %v\n", offset)
             newFiles, err := fs.FileRange(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset) % len(fs.MachineIds)]], start, end)
             if err == nil {
-                fmt.Printf("newFiles (offset of %v): %v\n", offset, newFiles)
                 for _, newFile := range newFiles {
                     err := fs.Get(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset) % len(fs.MachineIds)]], newFile, filepath.Join(fs.TempDirectory, newFile)) 
                     if err != nil {
@@ -90,8 +88,6 @@ func onDelete(machineId string) {
                     }
                 }
                 break
-            } else {
-                fmt.Printf("offset of %v failed\n", offset)
             }
         }
     }
