@@ -39,7 +39,7 @@ func ListenToCommands(){
                 sdfsFilename := matches[1]
                 localFilename := matches[2]
                 index := fs.GetFileOwner(sdfsFilename)
-                fs.Get(fs.MachineStub[fs.MachineIds[index]], sdfsFilename, localFilename)
+                fs.Get(fs.MachineStubs[fs.MachineIds[index]], sdfsFilename, localFilename)
             }
         case deleteRe.MatchString(input):
             matches := deleteRe.FindStringSubmatch(input)
