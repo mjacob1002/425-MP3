@@ -10,6 +10,7 @@ import (
     "log"
     "google.golang.org/grpc"
     "sort"
+	"sync"
     "hash/fnv"
 )
 
@@ -19,8 +20,30 @@ var MachineStubs map[string] FileSystemClient = make(map[string]FileSystemClient
 var MachineIds []string = []string{}
 var ThisMachineIdIdx int
 
+// TODO: try and phase these out this iteration...
 var Files []string = []string{}
 var ReplicaFiles []string = []string{}
+
+var FilesMapMutex sync.Mutex // used for mutual exclusion in modifying this shit
+var FilesMap map[string]*FileStruct = make(map[string]*FileStruct);
+
+func SearchForFile(sdfsName string) (*FileStruct, int64) {
+	FilesMapMutex.Lock()
+	defer FilesMapMutex.Unlock();
+	// have mutex to search the thingy
+	fileStruct, ok := FilesMap[sdfsName];
+	if !ok {
+		return nil, 1;
+	}
+	return fileStruct, 0
+}
+
+func CreateFileStruct(sdfsName string) *FileStruct{
+	FilesMapMutex.Lock(); // get mutex to the thingy
+	defer FilesMapMutex.Unlock()
+	FilesMap[sdfsName] = NewFileStruct(sdfsName, -1) // TODO: invoke constructor to add the replica to it
+	return FilesMap[sdfsName]
+}
 
 type Server struct {
     UnimplementedFileSystemServer
@@ -55,6 +78,14 @@ func InitializeGRPCConnection(machineId string, serverAddress string) {
 }
 
 func (s *Server) Get(in *GetRequest, stream FileSystem_GetServer) error {
+	// do the mutex locking garbage
+	fileStruct, status := SearchForFile(in.SdfsName)
+	if status == 1 {
+		// what do I do in the case of a Getting a non-existent file
+		fmt.Printf("%s does not exist on the local filesystem...\n", in.SdfsName);
+	}
+	fileStruct.RLock();
+	defer fileStruct.RUnlock();
     // Open file
     filename := filepath.Join(TempDirectory, in.SdfsName)
     file, err := os.Open(filename)
@@ -89,7 +120,6 @@ func (s *Server) Put(stream FileSystem_PutServer) error {
     var sdfsFilename, filename string
     var replica bool
     var file *os.File
-
     // Loop over bytes from the network and write to file
     for {
         req, err := stream.Recv()
@@ -105,6 +135,16 @@ func (s *Server) Put(stream FileSystem_PutServer) error {
             sdfsFilename = req.SdfsName
             replica = req.Replica
             filename = filepath.Join(TempDirectory, sdfsFilename)
+			// before, search the filelist map for the corresponding filestruct
+			fileStruct, status := SearchForFile(sdfsFilename)
+			if status == 1 {
+				// have to create a block for this
+				fileStruct = CreateFileStruct(sdfsFilename) // modify this function to set the field
+			}
+			// get writing access
+			fileStruct.WLock();
+			defer fileStruct.WUnlock();
+			fileStruct.deleted = false; // this file is no longer deleted
             file, err = os.Create(filename)
 
             if err != nil {
@@ -197,7 +237,16 @@ func remove(slice []string, element string) []string {
 
 func (s *Server) Delete(ctx context.Context, in *DeleteRequest) (*DeleteResponse, error) {
     sdfsFilename, replica := in.SdfsName, in.Replica
-    filename := filepath.Join(TempDirectory, sdfsFilename) 
+	// get write access to this shit
+	fileStruct, status := SearchForFile(sdfsFilename)
+	if status == 1 {
+			fmt.Printf("trying to delete %s, but the file isn't here...");
+	}
+	// get writing access
+	fileStruct.WLock();
+	defer fileStruct.WUnlock();
+	fileStruct.deleted = true; // set the deleted field to true;
+    filename := filepath.Join(TempDirectory, sdfsFilename)
     if err := os.Remove(filename); err != nil {
         fmt.Errorf("os.Remove: %v\n", err)
         return &DeleteResponse{}, err
