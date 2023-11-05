@@ -156,7 +156,7 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
             fmt.Errorf("file.Read: %v\n", err)
         }
 
-        req := PutRequest{ PayloadToWrite: string(buffer[:bytesRead]), LocalName: localFilename, SdfsName: sdfsFilename, Replica: replica }
+        req := PutRequest{ PayloadToWrite: string(buffer[:bytesRead]), SdfsName: sdfsFilename, Replica: replica }
         stream.Send(&req);
     }
 
@@ -187,7 +187,7 @@ func (s *Server) Delete(ctx context.Context, in *DeleteRequest) (*DeleteResponse
 
 // should be called instead of directly calling the RPC
 func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string) {
-    request := GetRequest{ SdfsName: sdfsFilename, LocalName: localFilename }
+    request := GetRequest{ SdfsName: sdfsFilename }
     // implement location logic here; going to just go to the first entry in our map for noA
     file, err := os.Create(localFilename) // this is standard open - check if we need destructive write or something
     if err != nil {
