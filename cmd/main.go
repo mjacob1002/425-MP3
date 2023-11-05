@@ -61,17 +61,17 @@ func onDelete(machineId string) {
 	})
 
     if (fs.ThisMachineIdIdx - 1) % len(fs.MachineIds) == index {
-        hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx - 5) % len(fs.MachineIds)]))
+        hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)]))
         start := hasher.Sum32()
         hasher.Reset()
 
-        hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx - 4) % len(fs.MachineIds)]))
+        hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)]))
         end := hasher.Sum32()
         hasher.Reset()
 
-        fmt.Printf("querying from %v:\n", fs.MachineIds[(fs.ThisMachineIdIdx - 4) % len(fs.MachineIds)])
+        fmt.Printf("querying from %v:\n", fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)])
 
-        newReplicas := fs.FileRange(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx - 4) % len(fs.MachineIds)]], start, end)
+        newReplicas := fs.FileRange(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)]], start, end)
 
         fmt.Printf("newReplicas: %v\n", newReplicas)
     }
