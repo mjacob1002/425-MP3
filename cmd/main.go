@@ -7,6 +7,7 @@ import (
     "time"
     "sort"
     "hash/fnv"
+    "path/filepath"
     membership "github.com/mjacob1002/425-MP3/pkg/membership"
     "github.com/mjacob1002/425-MP3/pkg/cli"
 	fs "github.com/mjacob1002/425-MP3/pkg/filesystem"
@@ -60,23 +61,42 @@ func onDelete(machineId string) {
 		return machineIdsIHash >= machineIdHash
 	})
 
-    // TODO: Add condition to not query if ring is too small
-    if (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
-        hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)]))
-        start := hasher.Sum32()
-        hasher.Reset()
+    if len(fs.MachineIds) > 4 && (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
+        // We need to copy files around to ensure we have 3 replicas of files
 
-        hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)]))
-        end := hasher.Sum32()
-        hasher.Reset()
+        // Check all 4 machines that occur previously in the ring
+        for offset := 4; offset > 0; offset-- {
+            hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset - 1) % len(fs.MachineIds)]))
+            start := hasher.Sum32()
+            hasher.Reset()
 
-        newReplicas := fs.FileRange(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)]], start, end)
+            hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset) % len(fs.MachineIds)]))
+            end := hasher.Sum32()
+            hasher.Reset()
 
-        // TODO: GET them and add them to list
-        fmt.Printf("newReplicas: %v\n", newReplicas)
+            newReplicaFiles, err := fs.FileRange(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset) % len(fs.MachineIds)]], start, end)
+            if err == nil {
+                fmt.Printf("newReplicaFiles: %v\n", newReplicaFiles)
+                for _, newReplicaFile := range newReplicaFiles {
+                    err := fs.Get(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset) % len(fs.MachineIds)]], newReplicaFile, filepath.Join(fs.TempDirectory, newReplicaFile)) 
+                    if err != nil {
+                        fmt.Printf("fs.Get: %v\n", err)
+                    } else {
+                        fs.ReplicaFiles = append(fs.ReplicaFiles, newReplicaFile)
+                    }
+                }
+                break
+            } else {
+                fmt.Printf("offset of %v failed\n", offset)
+            }
+        }
     }
 
     // TODO: If we are at the next node, move the replica files to the main files list
+    // newReplicaFilesList := []string{}
+    // for _, replicaFile := range ReplicaFiles  {
+        
+    // }
 
     // Remove old machine id to list
     fs.MachineIds = append(fs.MachineIds[:index], fs.MachineIds[index+1:]...)

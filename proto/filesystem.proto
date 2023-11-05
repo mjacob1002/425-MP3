@@ -1,10 +1,11 @@
 syntax="proto3";
 option go_package = "../pkg/filesystem";
+import "google/protobuf/empty.proto";
 
 service FileSystem {
 	rpc Get(GetRequest) returns (stream GetResponse) {}
-	rpc Put(stream PutRequest) returns (PutResponse) {}
-	rpc Delete(DeleteRequest) returns (DeleteResponse) {}
+	rpc Put(stream PutRequest) returns (google.protobuf.Empty) {}
+	rpc Delete(DeleteRequest) returns (google.protobuf.Empty) {}
 	rpc FileRange(FileRangeRequest) returns (FileRangeResponse) {}
 }
 
@@ -23,17 +24,9 @@ message PutRequest {
     bool replica = 3;
 }
 
-message PutResponse {
-	int64 err = 1;
-}
-
 message DeleteRequest {
 	string sdfs_name = 1;
     bool replica = 2;
-}
-
-message DeleteResponse {
-	int64 err = 1;
 }
 
 message FileRangeRequest {

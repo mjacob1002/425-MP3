@@ -11,6 +11,7 @@ import (
     "google.golang.org/grpc"
     "sort"
     "hash/fnv"
+    "google.golang.org/protobuf/types/known/emptypb"
 )
 
 var TempDirectory string
@@ -60,6 +61,7 @@ func (s *Server) Get(in *GetRequest, stream FileSystem_GetServer) error {
     file, err := os.Open(filename)
     if err != nil {
         fmt.Errorf("os.Open: %v\n", err)
+        return err
     }
 
     // Loop over bytes in file and send over the network
@@ -71,6 +73,7 @@ func (s *Server) Get(in *GetRequest, stream FileSystem_GetServer) error {
             break
         } else if err != nil {
             fmt.Errorf("file.Read: %v\n", err)
+            return err
         }
 
         resp := GetResponse{ Payload: string(buffer[:bytesRead]) }
@@ -80,8 +83,10 @@ func (s *Server) Get(in *GetRequest, stream FileSystem_GetServer) error {
     err = stream.Send(&GetResponse{}) // do I need this to end the connection for RPC?
     if err != nil {
         fmt.Println(err)
+        return err
     }
-    return err
+
+    return nil
 }
 
 func (s *Server) Put(stream FileSystem_PutServer) error {
@@ -98,6 +103,7 @@ func (s *Server) Put(stream FileSystem_PutServer) error {
             break
         } else if err != nil {
             fmt.Errorf("stream.Recv: %v\n", err)
+            return err
         }
 
         if !initialized {
@@ -134,26 +140,28 @@ func (s *Server) Put(stream FileSystem_PutServer) error {
             if idx == ThisMachineIdIdx {
                 break
             }
-
-            Put(MachineStubs[MachineIds[idx]], filename, sdfsFilename, true)
+ 
+            if err := Put(MachineStubs[MachineIds[idx]], filename, sdfsFilename, true); err != nil {
+                fmt.Errorf("Put: %v\n", err)
+            }
         }
     }
 
-    return stream.SendAndClose(&PutResponse{ Err: 0 })
+    return nil
 }
 
-func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string, replica bool) {
+func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string, replica bool) error {
     // Open file
     file, err := os.Open(localFilename)
     if err != nil {
         fmt.Errorf("os.Open: %v\n", err)
-        return
+        return err
     }
 
     stream, err := targetStub.Put(context.Background())
     if err != nil {
         fmt.Errorf("targetStub.Put: %v\n", err)
-        return
+        return err
     }
 
     // Loop over bytes in file and send over the network
@@ -174,15 +182,21 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
     // Close stream and receive
     if _, err = stream.CloseAndRecv(); err != nil {
         fmt.Errorf("stream.CloseAndRecv: %v\n", err)
+        return err
     }
+
+    return nil
 }
 
-func Delete(targetStub FileSystemClient, sdfsFilename string, replica bool) {
+func Delete(targetStub FileSystemClient, sdfsFilename string, replica bool) error {
     request := DeleteRequest{ SdfsName: sdfsFilename, Replica: replica }
     _, err := targetStub.Delete(context.Background(), &request)
     if err != nil {
         fmt.Errorf("targetStub.Read: %v\n", err)
+        return err
     }
+
+    return nil
 }
 
 func remove(slice []string, element string) []string {
@@ -195,12 +209,12 @@ func remove(slice []string, element string) []string {
     return newSlice
 }
 
-func (s *Server) Delete(ctx context.Context, in *DeleteRequest) (*DeleteResponse, error) {
+func (s *Server) Delete(ctx context.Context, in *DeleteRequest) (*emptypb.Empty, error) {
     sdfsFilename, replica := in.SdfsName, in.Replica
     filename := filepath.Join(TempDirectory, sdfsFilename) 
     if err := os.Remove(filename); err != nil {
         fmt.Errorf("os.Remove: %v\n", err)
-        return &DeleteResponse{}, err
+        return nil, err
     }
 
     // Remove filename from local file list
@@ -222,11 +236,11 @@ func (s *Server) Delete(ctx context.Context, in *DeleteRequest) (*DeleteResponse
         }
     }
 
-    return &DeleteResponse{}, nil
+    return nil, nil
 }
 
 // should be called instead of directly calling the RPC
-func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string) {
+func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string) error {
     request := GetRequest{ SdfsName: sdfsFilename }
     // implement location logic here; going to just go to the first entry in our map for noA
     file, err := os.Create(localFilename) // this is standard open - check if we need destructive write or something
@@ -237,7 +251,9 @@ func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string)
     stream, err := targetStub.Get(context.Background(), &request)
     if err != nil {
         log.Fatal(err)
+        return err
     }
+
     for {
         response, err := stream.Recv()
         if err == io.EOF { // it's done sending data to client
@@ -245,10 +261,13 @@ func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string)
         }
         if err != nil {
             log.Fatal(err)
+            return err
         }
         // write to the file
         file.Write([]byte(response.Payload))
     }
+    
+    return nil
 }
 
 func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRangeResponse, error) {
@@ -278,16 +297,16 @@ func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRang
     return &(FileRangeResponse{ SdfsNames: sdfsNames }), nil
 }
 
-func FileRange(targetStub FileSystemClient, start uint32, end uint32) []string {
+func FileRange(targetStub FileSystemClient, start uint32, end uint32) ([]string, error) {
     request := &FileRangeRequest{ Start: start, End: end }
 
     response, err := targetStub.FileRange(context.Background(), request)
     if err != nil {
         fmt.Errorf("client.FileRange: %v", err)
-        return []string{}
+        return nil, err
     }
 
-    return response.SdfsNames
+    return response.SdfsNames, nil
 }
 
 func InitializeFileSystem(port string) {
