@@ -194,6 +194,7 @@ func Delete(targetStub FileSystemClient, sdfsFilename string, replica bool) erro
     defer cancel()
 
     request := DeleteRequest{ SdfsName: sdfsFilename, Replica: replica }
+    fmt.Printf("%s\n", request.String())
     _, err := targetStub.Delete(contextWithTimeout, &request)
     if err != nil {
         fmt.Printf(fmt.Errorf("targetStub.Read: %v\n", err).Error())
@@ -236,7 +237,7 @@ func (s *Server) Delete(ctx context.Context, in *DeleteRequest) (*emptypb.Empty,
         }
     }
 
-    return nil, nil
+    return &emptypb.Empty{}, nil
 }
 
 // should be called instead of directly calling the RPC
