@@ -21,6 +21,7 @@ message PutRequest {
 	string payload_to_write = 1;
 	string sdfs_name = 2;
 	string local_name = 3;
+    bool replica = 4;
 }
 
 message PutResponse {

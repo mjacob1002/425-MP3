@@ -15,7 +15,6 @@ import (
 
 var thisMachineName string
 var thisMachineId string
-var machineIds []string = []string{}
 
 
 func onAdd(machineId string, serverAddress string) {
@@ -27,14 +26,17 @@ func onAdd(machineId string, serverAddress string) {
     machineIdHash := hasher.Sum32()
     hasher.Reset()
 
-    index := sort.Search(len(machineIds), func(i int) bool {
-        hasher.Write([]byte(machineIds[i]))
+    index := sort.Search(len(fs.MachineIds), func(i int) bool {
+        hasher.Write([]byte(fs.MachineIds[i]))
         machineIdsIHash := hasher.Sum32()
         hasher.Reset()
 		return machineIdsIHash >= machineIdHash
 	})
 
-	machineIds = append(machineIds[:index], append([]string{machineId}, machineIds[index:]...)...)
+	fs.MachineIds = append(fs.MachineIds[:index], append([]string{machineId}, fs.MachineIds[index:]...)...)
+    if index <= fs.MachineIdsIdx {
+        fs.MachineIdsIdx++
+    }
 	fmt.Println("Trying to connect to ", serverAddress);
 	conn, err := grpc.Dial(serverAddress, grpc.WithInsecure())
 	if err != nil {
@@ -59,14 +61,17 @@ func onDelete(machineId string) {
     machineIdHash := hasher.Sum32()
     hasher.Reset()
 
-    index := sort.Search(len(machineIds), func(i int) bool {
-        hasher.Write([]byte(machineIds[i]))
+    index := sort.Search(len(fs.MachineIds), func(i int) bool {
+        hasher.Write([]byte(fs.MachineIds[i]))
         machineIdsIHash := hasher.Sum32()
         hasher.Reset()
 		return machineIdsIHash >= machineIdHash
 	})
 
-    machineIds = append(machineIds[:index], machineIds[index+1:]...)
+    fs.MachineIds = append(fs.MachineIds[:index], fs.MachineIds[index+1:]...)
+    if index <= fs.MachineIdsIdx {
+        fs.MachineIdsIdx--
+    }
 }
 
 func main() {
@@ -80,7 +85,8 @@ func main() {
     flag.Parse()
 
     thisMachineId = (thisMachineName + "_" + strconv.FormatInt(time.Now().UnixMilli(), 10))
-    machineIds = append(machineIds, thisMachineId)
+    fs.MachineIds = append(fs.MachineIds, thisMachineId)
+    fs.MachineIdsIdx = 0
 	fmt.Printf("I am using tcp_port %d\n", fs.Tcp_port);
 	go fs.InitializeFileSystem()
 	go membership.Join(

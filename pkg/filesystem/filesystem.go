@@ -15,6 +15,8 @@ var Tcp_port int64;
 var TempDirectory string;
 // stores the stubs used for gRPC methods
 var MachineStubs map[string] FileSystemClient = make(map[string]FileSystemClient)
+var MachineIds []string = []string{}
+var MachineIdsIdx int
 
 type Server struct {
 	UnimplementedFileSystemServer;
@@ -50,7 +52,8 @@ func(s *Server) Get(in *GetRequest, stream FileSystem_GetServer) error {
 func (s *Server) Put(stream FileSystem_PutServer) error {
 		// acquire a lock here with the information - also incorporate the filestruct idea here
 		// go through all of their messages and write them
-		fname := ""
+		fname, sdfsname := "", ""
+        replica := false
 		var file *os.File;
 		for {
 			req, err := stream.Recv();
@@ -67,11 +70,23 @@ func (s *Server) Put(stream FileSystem_PutServer) error {
 					log.Fatal(err)
 				}
 				file = tempvar
+                replica = req.Replica
 			}
 			file.Write([]byte(req.PayloadToWrite));
 		}
 		file.Close()
-		fmt.Println("just wrote to the file in %s\n", TempDirectory);
+		fmt.Println("just wrote to the file in %s\n", TempDirectory)
+        if !replica {
+            // send out to other machines
+            for i := 1; i < 4; i++ {
+                idx := (i + MachineIdsIdx) % len(MachineIds)
+                if idx == MachineIdsIdx {
+                    break
+                }
+                // send to machine at idx
+                Put(MachineStubs[MachineIds[idx]], fname, sdfsname)
+            }
+        }
 		return stream.SendAndClose(&PutResponse{Err: 0});
 }
 
