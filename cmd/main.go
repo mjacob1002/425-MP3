@@ -60,7 +60,8 @@ func onDelete(machineId string) {
 		return machineIdsIHash >= machineIdHash
 	})
 
-    if fs.ThisMachineIdIdx == (index + 1) % len(fs.MachineIds) {
+    // TODO: Add condition to not query if ring is too small
+    if (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
         hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)]))
         start := hasher.Sum32()
         hasher.Reset()
@@ -69,12 +70,13 @@ func onDelete(machineId string) {
         end := hasher.Sum32()
         hasher.Reset()
 
-        fmt.Printf("querying from %v:\n", fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)])
-
         newReplicas := fs.FileRange(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)]], start, end)
 
+        // TODO: GET them and add them to list
         fmt.Printf("newReplicas: %v\n", newReplicas)
     }
+
+    // TODO: If we are at the next node, move the replica files to the main files list
 
     // Remove old machine id to list
     fs.MachineIds = append(fs.MachineIds[:index], fs.MachineIds[index+1:]...)

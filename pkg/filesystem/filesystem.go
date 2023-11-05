@@ -252,7 +252,6 @@ func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string)
 }
 
 func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRangeResponse, error) {
-    fmt.Printf("received a query: %v to %v\n", in.Start, in.End)
     hasher := fnv.New32a()
     var sdfsNames []string
 
@@ -261,7 +260,6 @@ func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRang
         fileHash := hasher.Sum32()
         hasher.Reset()
 
-        fmt.Printf("testing file %v with hash %v\n", file, fileHash)
         if (in.Start < in.End && in.Start <= fileHash && fileHash < in.End) || (in.End < in.Start && (in.Start <= fileHash || fileHash < in.End)) {
             sdfsNames = append(sdfsNames, file)
         }
@@ -272,13 +270,10 @@ func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRang
         fileHash := hasher.Sum32()
         hasher.Reset()
 
-        fmt.Printf("testing file %v with hash %v\n", file, fileHash)
         if (in.Start < in.End && in.Start <= fileHash && fileHash < in.End) || (in.End < in.Start && (in.Start <= fileHash || fileHash < in.End)) {
             sdfsNames = append(sdfsNames, file)
         }
     }
-
-    fmt.Printf("returning: %v\n", sdfsNames)
 
     return &(FileRangeResponse{ SdfsNames: sdfsNames }), nil
 }

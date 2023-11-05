@@ -38,8 +38,9 @@ func ListenToCommands(){
             if len(matches) == 3 {
                 sdfsFilename := matches[1]
                 localFilename := matches[2]
-                fmt.Printf("localFilename: <%v>, sdfsFilename: <%v>\n", localFilename, sdfsFilename)
-            }     
+                index := fs.GetFileOwner(sdfsFilename)
+                fs.Get(fs.MachineStub[fs.MachineIds[index]], sdfsFilename, localFilename)
+            }
         case deleteRe.MatchString(input):
             matches := deleteRe.FindStringSubmatch(input)
             if len(matches) == 2 {
