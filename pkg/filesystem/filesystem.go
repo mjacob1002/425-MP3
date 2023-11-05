@@ -262,7 +262,7 @@ func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRang
         hasher.Reset()
 
         fmt.Printf("testing file %v with hash %v\n", file, fileHash)
-        if in.Start <= fileHash && fileHash < in.End {
+        if (in.Start < in.End && in.Start <= fileHash && fileHash < in.End) || (in.End < in.Start && (in.Start <= fileHash || fileHash < in.End)) {
             sdfsNames = append(sdfsNames, file)
         }
     }
@@ -273,7 +273,7 @@ func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRang
         hasher.Reset()
 
         fmt.Printf("testing file %v with hash %v\n", file, fileHash)
-        if in.Start <= fileHash && fileHash < in.End {
+        if (in.Start < in.End && in.Start <= fileHash && fileHash < in.End) || (in.End < in.Start && (in.Start <= fileHash || fileHash < in.End)) {
             sdfsNames = append(sdfsNames, file)
         }
     }
