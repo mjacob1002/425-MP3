@@ -98,28 +98,5 @@ func main() {
         onDelete,
     )
 
-    // select {}
-	time.Sleep(20 * time.Second)
-	fmt.Println("Time to test RPC..");
-	for key, value := range(fs.MachineStubs){
-		fmt.Println("Working with key=", key);
-		fs.Put(value, "foolocal.txt", "fooremote.txt");
-		fs.Get(value, "fooremote.txt", "foonew.txt");
-//		req := fs.GetRequest{SdfsName: "sdfsfile", LocalName: "localfname"} // create a request
-//		stream, err := value.Get(context.Background(), &req);
-//		if err != nil {
-//			fmt.Println(err);
-//		}
-//		for {
-//			resp, err := stream.Recv()
-//			if err == io.EOF {
-//				break
-//			}
-//			if err != nil {
-//				log.Fatal(err);
-//			}
-//			fmt.Printf("Response: %s\n", resp.String())
-//		}
-	}
 	select {}
 }
