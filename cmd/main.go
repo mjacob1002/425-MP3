@@ -66,11 +66,11 @@ func onDelete(machineId string) {
 
         // Check all 4 machines that occur previously in the ring
         for offset := 4; offset > 0; offset-- {
-            hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset - 1) % len(fs.MachineIds)]))
+            hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)]))
             start := hasher.Sum32()
             hasher.Reset()
 
-            hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - offset) % len(fs.MachineIds)]))
+            hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)]))
             end := hasher.Sum32()
             hasher.Reset()
 
