@@ -252,6 +252,7 @@ func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string)
 }
 
 func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRangeResponse, error) {
+    fmt.Printf("received a query\n")
     hasher := fnv.New32a()
     var sdfsNames []string
 
@@ -274,6 +275,8 @@ func (s *Server) FileRange(ctx context.Context, in *FileRangeRequest) (*FileRang
             sdfsNames = append(sdfsNames, file)
         }
     }
+
+    fmt.Printf("returning: %v\n", sdfsNames)
 
     return &(FileRangeResponse{ SdfsNames: sdfsNames }), nil
 }

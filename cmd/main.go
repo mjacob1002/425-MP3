@@ -60,7 +60,7 @@ func onDelete(machineId string) {
 		return machineIdsIHash >= machineIdHash
 	})
 
-    if fs.ThisMachineIdIdx - 1 == index {
+    if (fs.ThisMachineIdIdx - 1) % len(fs.MachineIds) == index {
         hasher.Write([]byte(fs.MachineIds[(fs.ThisMachineIdIdx - 4) % len(fs.MachineIds)]))
         start := hasher.Sum32()
         hasher.Reset()
@@ -69,9 +69,11 @@ func onDelete(machineId string) {
         end := hasher.Sum32()
         hasher.Reset()
 
+        fmt.Printf("querying from %v:\n", fs.MachineIds[(fs.ThisMachineIdIdx - 4) % len(fs.MachineIds)])
+
         newReplicas := fs.FileRange(fs.MachineStubs[fs.MachineIds[(fs.ThisMachineIdIdx - 4) % len(fs.MachineIds)]], start, end)
 
-        fmt.Println("newReplicas: %v\n", newReplicas)
+        fmt.Printf("newReplicas: %v\n", newReplicas)
     }
 
     // Remove old machine id to list
