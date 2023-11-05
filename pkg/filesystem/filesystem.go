@@ -86,13 +86,13 @@ func (s *Server) Put(stream FileSystem_PutServer) error {
                     break
                 }
                 // send to machine at idx
-                Put(MachineStubs[MachineIds[idx]], fname, sdfsname)
+                Put(MachineStubs[MachineIds[idx]], fname, sdfsname, true)
             }
         }
 		return stream.SendAndClose(&PutResponse{Err: 0});
 }
 
-func Put(targetStub FileSystemClient, localfname string, sdfsname string){
+func Put(targetStub FileSystemClient, localfname string, sdfsname string, replica bool){
 	// do we have to do mutex shit here? Not sure. We don't need to do any struct stuff here
 	file, err := os.Open(localfname)
 	if err != nil {
@@ -111,7 +111,7 @@ func Put(targetStub FileSystemClient, localfname string, sdfsname string){
 			if err != nil {
 				log.Fatal(err)
 			}
-			req := PutRequest{PayloadToWrite: string(buffer[:bytesRead]), LocalName: localfname, SdfsName: sdfsname}
+			req := PutRequest{PayloadToWrite: string(buffer[:bytesRead]), LocalName: localfname, SdfsName: sdfsname, Replica: replica}
 			stream.Send(&req); // send stuff over the network
 	}
 	response, err := stream.CloseAndRecv() // close and receive
