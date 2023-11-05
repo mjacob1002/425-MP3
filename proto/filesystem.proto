@@ -19,7 +19,7 @@ message GetResponse{
 message PutRequest {
 	string payload_to_write = 1;
 	string sdfs_name = 2;
-    bool replica = 4;
+    bool replica = 3;
 }
 
 message PutResponse {
@@ -28,6 +28,7 @@ message PutResponse {
 
 message DeleteRequest {
 	string sdfs_name = 1;
+    bool replica = 2;
 }
 
 message DeleteResponse {

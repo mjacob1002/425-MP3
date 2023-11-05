@@ -13,7 +13,7 @@ import (
     "hash/fnv"
 )
 
-var TempDirectory string;
+var TempDirectory string
 // stores the stubs used for gRPC methods
 var MachineStubs map[string] FileSystemClient = make(map[string]FileSystemClient)
 var MachineIds []string = []string{}
@@ -23,7 +23,7 @@ var Files []string = []string{}
 var ReplicaFiles []string = []string{}
 
 type Server struct {
-    UnimplementedFileSystemServer;
+    UnimplementedFileSystemServer
 }
 
 func GetFileOwner(filename string) int {
@@ -47,7 +47,7 @@ func InitializeGRPCConnection(machineId string, serverAddress string) {
     // Establish TCP connection with new node
 	conn, err := grpc.Dial(serverAddress, grpc.WithInsecure())
 	if err != nil {
-        fmt.Errorf("grpc.Dial: %v\n", err);
+        fmt.Errorf("grpc.Dial: %v\n", err)
 	}
 
 	client := NewFileSystemClient(conn)
@@ -55,84 +55,95 @@ func InitializeGRPCConnection(machineId string, serverAddress string) {
 }
 
 func (s *Server) Get(in *GetRequest, stream FileSystem_GetServer) error {
+    // Open file
     filename := filepath.Join(TempDirectory, in.SdfsName)
     file, err := os.Open(filename)
     if err != nil {
         fmt.Errorf("os.Open: %v\n", err)
     }
 
+    // Loop over bytes in file and send over the network
     for {
         buffer := make([]byte, 4096)
         bytesRead, err := file.Read(buffer)
 
         if err == io.EOF {
-            break;
+            break
         } else if err != nil {
             fmt.Errorf("file.Read: %v\n", err)
         }
 
         resp := GetResponse{ Payload: string(buffer[:bytesRead]) }
-        stream.Send(&resp);
+        stream.Send(&resp)
     }
 
-    err = stream.Send(&GetResponse{}); // do I need this to end the connection for RPC?
+    err = stream.Send(&GetResponse{}) // do I need this to end the connection for RPC?
     if err != nil {
-        fmt.Println(err);
+        fmt.Println(err)
     }
-    return err;
+    return err
 }
 
 func (s *Server) Put(stream FileSystem_PutServer) error {
-    // acquire a lock here with the information - also incorporate the filestruct idea here
-    // go through all of their messages and write them
-    fname, sdfsname := "", ""
-    replica := false
-    var file *os.File;
+    initialized := false
+    var sdfsFilename, filename string
+    var replica bool
+    var file *os.File
+
+    // Loop over bytes from the network and write to file
     for {
-        req, err := stream.Recv();
+        req, err := stream.Recv()
+
         if err == io.EOF {
-            break;
+            break
+        } else if err != nil {
+            fmt.Errorf("stream.Recv: %v\n", err)
         }
-        if err != nil {
-            log.Fatal(err);
-        }
-        if fname == "" {
-            fname = filepath.Join(TempDirectory, req.SdfsName)
-            tempvar, err := os.Create(fname);
-            if err != nil {
-                log.Fatal(err)
-            }
-            file = tempvar
+
+        if !initialized {
+            // Initialize request variables
+            sdfsFilename = req.SdfsName
             replica = req.Replica
-            sdfsname = req.SdfsName
+            filename = filepath.Join(TempDirectory, sdfsFilename)
+            file, err = os.Create(filename)
+
+            if err != nil {
+                fmt.Errorf("os.Create: %v\n", err)
+                return err
+            }
+
+            initialized = true
         }
-        file.Write([]byte(req.PayloadToWrite));
+
+        file.Write([]byte(req.PayloadToWrite))
     }
+
     file.Close()
-    fmt.Printf("just wrote to the file in %v\n", TempDirectory)
 
+    // Add filename to local file list
     if !replica {
-        Files = append(Files, sdfsname)
+        Files = append(Files, sdfsFilename)
     } else {
-        ReplicaFiles = append(ReplicaFiles, sdfsname)
+        ReplicaFiles = append(ReplicaFiles, sdfsFilename)
     }
 
     if !replica {
-        // send out to other machines
+        // Send file to other machines as a replica
         for i := 1; i < 4; i++ {
             idx := (i + ThisMachineIdIdx) % len(MachineIds)
             if idx == ThisMachineIdIdx {
                 break
             }
-            // send to machine at idx
-            fmt.Printf("should be sending out %v to index %v: %v\n", sdfsname, idx, MachineIds[idx])
-            Put(MachineStubs[MachineIds[idx]], fname, sdfsname, true)
+
+            Put(MachineStubs[MachineIds[idx]], filename, sdfsFilename, true)
         }
     }
-    return stream.SendAndClose(&PutResponse{Err: 0});
+
+    return stream.SendAndClose(&PutResponse{ Err: 0 })
 }
 
 func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string, replica bool) {
+    // Open file
     file, err := os.Open(localFilename)
     if err != nil {
         fmt.Errorf("os.Open: %v\n", err)
@@ -141,7 +152,7 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
 
     stream, err := targetStub.Put(context.Background())
     if err != nil {
-        fmt.Errorf("FileSystemClient.Put: %v\n", err)
+        fmt.Errorf("targetStub.Put: %v\n", err)
         return
     }
 
@@ -151,38 +162,67 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
         bytesRead, err := file.Read(buffer)
 
         if err == io.EOF {
-            break;
+            break
         } else if err != nil {
             fmt.Errorf("file.Read: %v\n", err)
         }
 
         req := PutRequest{ PayloadToWrite: string(buffer[:bytesRead]), SdfsName: sdfsFilename, Replica: replica }
-        stream.Send(&req);
+        stream.Send(&req)
     }
 
     // Close stream and receive
     if _, err = stream.CloseAndRecv(); err != nil {
-        fmt.Errorf("file.Read: %v\n", err)
+        fmt.Errorf("stream.CloseAndRecv: %v\n", err)
     }
 }
 
-func Delete(targetStub FileSystemClient, remotefname string){
-    deletemsg := DeleteRequest{SdfsName: remotefname}
-    resp, err := targetStub.Delete(context.Background(), &deletemsg);
+func Delete(targetStub FileSystemClient, sdfsFilename string, replica bool) {
+    request := DeleteRequest{ SdfsName: sdfsFilename, Replica: replica }
+    _, err := targetStub.Delete(context.Background(), &request)
     if err != nil {
-        log.Fatal(err)
+        fmt.Errorf("targetStub.Read: %v\n", err)
     }
-    fmt.Println("Delete response: %s\n", resp.String());
+}
+
+func remove(slice []string, element string) []string {
+    newSlice := []string{}
+    for _, s := range slice {
+        if s != element {
+            newSlice = append(newSlice, s)
+        }
+    }
+    return newSlice
 }
 
 func (s *Server) Delete(ctx context.Context, in *DeleteRequest) (*DeleteResponse, error) {
-    fmt.Println("Got invoked Delete by ", in.SdfsName);
-    fname := filepath.Join(TempDirectory, in.SdfsName);
-    err := os.Remove(fname);
-    if err != nil {
-        log.Fatal(err);
+    sdfsFilename, replica := in.SdfsName, in.Replica
+    filename := filepath.Join(TempDirectory, sdfsFilename) 
+    if err := os.Remove(filename); err != nil {
+        fmt.Errorf("os.Remove: %v\n", err)
+        return &DeleteResponse{}, err
     }
-    return &DeleteResponse{}, nil;
+
+    // Remove filename from local file list
+    if !replica {
+        Files = remove(Files, sdfsFilename)
+    } else {
+        ReplicaFiles = remove(ReplicaFiles, sdfsFilename)
+    }
+
+    if !replica {
+        // Tell other machines to delete file as a replica
+        for i := 1; i < 4; i++ {
+            idx := (i + ThisMachineIdIdx) % len(MachineIds)
+            if idx == ThisMachineIdIdx {
+                break
+            }
+
+            Delete(MachineStubs[MachineIds[idx]], sdfsFilename, true)
+        }
+    }
+
+    return &DeleteResponse{}, nil
 }
 
 // should be called instead of directly calling the RPC
@@ -191,23 +231,23 @@ func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string)
     // implement location logic here; going to just go to the first entry in our map for noA
     file, err := os.Create(localFilename) // this is standard open - check if we need destructive write or something
     if err != nil {
-        fmt.Println(err);
+        fmt.Println(err)
     }
     defer file.Close()
-    stream, err := targetStub.Get(context.Background(), &request);
+    stream, err := targetStub.Get(context.Background(), &request)
     if err != nil {
-        log.Fatal(err);
+        log.Fatal(err)
     }
     for {
         response, err := stream.Recv()
         if err == io.EOF { // it's done sending data to client
-            break;
+            break
         }
         if err != nil {
-            log.Fatal(err);
+            log.Fatal(err)
         }
         // write to the file
-        file.Write([]byte(response.Payload));
+        file.Write([]byte(response.Payload))
     }
 }
 
