@@ -8,6 +8,7 @@ import (
     "sort"
     "hash/fnv"
     membership "github.com/mjacob1002/425-MP3/pkg/membership"
+    "github.com/mjacob1002/425-MP3/pkg/cli"
 	"google.golang.org/grpc"
 	//"golang.org/x/net/context"
 	fs "github.com/mjacob1002/425-MP3/pkg/filesystem"
@@ -97,6 +98,7 @@ func main() {
         onAdd,
         onDelete,
     )
+    go cli.ListenToCommands()
 
     // select {}
 	time.Sleep(20 * time.Second)
@@ -104,7 +106,7 @@ func main() {
 	for key, value := range(fs.MachineStubs){
 		fmt.Println("Working with key=", key);
 		fs.Put(value, "foolocal.txt", "fooremote.txt");
-		fs.Get(value, "fooremote.txt", "foonew.txt");
+		// fs.Get(value, "fooremote.txt", "foonew.txt");
 //		req := fs.GetRequest{SdfsName: "sdfsfile", LocalName: "localfname"} // create a request
 //		stream, err := value.Get(context.Background(), &req);
 //		if err != nil {
