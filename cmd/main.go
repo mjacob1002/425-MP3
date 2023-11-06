@@ -51,8 +51,8 @@ func onAdd(machineId string, serverAddress string) {
         }
     } else if (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
         sdfsFilenames := fs.FileRangeNodes(
-            fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)],
             fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)],
+            fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 3) % len(fs.MachineIds)],
         )
 
         for _, sdfsFilename := range sdfsFilenames {
