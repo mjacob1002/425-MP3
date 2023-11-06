@@ -16,6 +16,7 @@ import (
 
 var thisMachineName string
 var thisMachineId string
+var recentlyAdded bool = true
 
 func onAdd(machineId string, serverAddress string) {
     fmt.Println("Adding new node to membership list:", machineId)
@@ -40,7 +41,8 @@ func onAdd(machineId string, serverAddress string) {
 
     fs.InitializeGRPCConnection(machineId, serverAddress)
 
-    if len(fs.MachineIds) < 4 || (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds) <= 4  {
+    if recentlyAdded {
+    } else if len(fs.MachineIds) < 4 || (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds) <= 4  {
         // We need to copy files around to ensure we have 3 replicas of files
         sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 0) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + 1) % len(fs.MachineIds)])
         for _, sdfsFilename := range sdfsFilenames {
@@ -157,6 +159,12 @@ func main() {
         onAdd,
         onDelete,
     )
+
+    go func() {
+        time.Sleep(5 * time.Second)
+        recentlyAdded = false
+    }()
+
     go cli.ListenToCommands()
 
 	select {}
