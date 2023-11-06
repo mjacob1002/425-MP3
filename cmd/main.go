@@ -51,10 +51,11 @@ func onAdd(machineId string, serverAddress string) {
         }
     } else if (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
         sdfsFilenames := fs.FileRangeNodes(
+            fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)],
             fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)],
-            fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 3) % len(fs.MachineIds)],
         )
 
+        /*
         fmt.Println("start")
         fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)]))
 
@@ -66,6 +67,7 @@ func onAdd(machineId string, serverAddress string) {
 
         fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 0) % len(fs.MachineIds)]))
         fmt.Println("end")
+        */
 
         for _, sdfsFilename := range sdfsFilenames {
             filename := filepath.Join(fs.TempDirectory, sdfsFilename)
