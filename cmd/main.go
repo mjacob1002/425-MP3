@@ -43,15 +43,15 @@ func onAdd(machineId string, serverAddress string) {
 
     if recentlyAdded {
     } else if len(fs.MachineIds) < 4 || (index + len(fs.MachineIds) + 1 - fs.ThisMachineIdIdx) % (len(fs.MachineIds) + 1) < 3  {
-        fmt.Printf("worst: %v < 4, %v <= 3\n", len(fs.MachineIds), (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds))
+        // fmt.Printf("worst: %v < 4, %v <= 3\n", len(fs.MachineIds), (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds))
         // We need to copy files around to ensure we have 3 replicas of files
         sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + 0) % len(fs.MachineIds)])
         for _, sdfsFilename := range sdfsFilenames {
-            fmt.Printf("fs.Put with args <%v> <%v> <%v>\n", machineId, filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename)
+            // fmt.Printf("fs.Put with args <%v> <%v> <%v>\n", machineId, filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename)
             fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, true)
         }
     } else if (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
-        fmt.Printf("distance: %v\n", (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds))
+        // fmt.Printf("distance: %v\n", (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds))
         newFiles := []string{}
         for _, file := range fs.Files {
             ownerIndex := fs.GetFileOwner(file)
@@ -62,13 +62,13 @@ func onAdd(machineId string, serverAddress string) {
                     fmt.Printf(fmt.Errorf("os.Remove: %v\n", err).Error())
                 }
             } else {
-                fmt.Printf("We do not delete %v because it is still withing range %v -- %v\n", file, (fs.ThisMachineIdIdx + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds), (index + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds))
+                // fmt.Printf("We do not delete %v because it is still withing range %v -- %v\n", file, (fs.ThisMachineIdIdx + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds), (index + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds))
                 newFiles = append(newFiles, file)
             }
         }
         fs.Files = newFiles
     } else {
-        fmt.Printf("distance: %v\n", (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds))
+        // fmt.Printf("distance: %v\n", (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds))
     }
 
     // Append new machine id to list
