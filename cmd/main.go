@@ -50,19 +50,20 @@ func onAdd(machineId string, serverAddress string) {
             fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, true)
         }
     } else if (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
+        newFiles := []string{}
         for _, file := range fs.Files {
-            ownerIndex := fs.GetFileOwner(sdfsFilename)
+            ownerIndex := fs.GetFileOwner(file)
 
             if (fs.ThisMachineIdIdx + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds) == 3 && (index + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds) <= 3 {
-                filename := filepath.Join(fs.TempDirectory, sdfsFilename)
+                filename := filepath.Join(fs.TempDirectory, file)
                 if err := os.Remove(filename); err != nil {
                     fmt.Printf(fmt.Errorf("os.Remove: %v\n", err).Error())
                 }
-
-                // Remove filename from local file list
-                fs.Files = fs.Remove(fs.Files, sdfsFilename)
+            } else {
+                newFiles = append(newFiles, file)
             }
         }
+        fs.Files = newFiles
     }
 
     // Append new machine id to list
