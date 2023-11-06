@@ -340,7 +340,7 @@ func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string)
             log.Fatal(err)
             return err
         }
-		fmt.Println("about to write payload...\n")
+		// fmt.Println("about to write payload...\n")
         // write to the file
         file.Write([]byte(response.Payload))
     }
