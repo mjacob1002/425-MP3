@@ -42,9 +42,9 @@ func onAdd(machineId string, serverAddress string) {
     fs.InitializeGRPCConnection(machineId, serverAddress)
 
     if recentlyAdded {
-    } else if len(fs.MachineIds) < 4 || (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds) == 3  {
+    } else if len(fs.MachineIds) < 4 || (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds) <= 3  {
         // We need to copy files around to ensure we have 3 replicas of files
-        sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 0) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + 1) % len(fs.MachineIds)])
+        sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + 0) % len(fs.MachineIds)])
         for _, sdfsFilename := range sdfsFilenames {
             fmt.Printf("fs.Put with args <%v> <%v> <%v>\n", machineId, filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename)
             fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, true)
@@ -60,6 +60,7 @@ func onAdd(machineId string, serverAddress string) {
                     fmt.Printf(fmt.Errorf("os.Remove: %v\n", err).Error())
                 }
             } else {
+                fmt.Printf("We do not delete %v because it is still withing range %v -- %v\n", file, (fs.ThisMachineIdIdx + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds), (index + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds))
                 newFiles = append(newFiles, file)
             }
         }
