@@ -5,9 +5,25 @@ import (
     "fmt"
     "os"
     "regexp"
-
+	membership "github.com/mjacob1002/425-MP3/pkg/membership"
 	fs "github.com/mjacob1002/425-MP3/pkg/filesystem"
 )
+
+func Multiread(sdfsName string) {
+	counter := 0;
+	machine_list := []string{}
+	for machine, _ := range(membership.MembershipList) {
+		if counter >= 6 {
+			break;
+		}
+		machine_list = append(machine_list, machine);
+		counter++;
+	}
+	fmt.Println("Nodes to ping: ", machine_list)
+	for _, machine := range(machine_list){
+		go fs.InvokeARead(machine,  sdfsName)
+	}
+}
 
 func ListenToCommands(){
     // Define command regular expressions
@@ -16,7 +32,7 @@ func ListenToCommands(){
     deleteRe := regexp.MustCompile(`^delete (\S+)\n$`)
     lsRe := regexp.MustCompile(`^ls (\S+)\n$`)
     storeRe := regexp.MustCompile(`^store\n$`)
-
+	multiReadRe := regexp.MustCompile(`^multiread (\S+)\n$`)
     listMemRe := regexp.MustCompile(`^list_mem\n$`)
 
     reader := bufio.NewReader(os.Stdin)
@@ -25,6 +41,10 @@ func ListenToCommands(){
         input, _ := reader.ReadString('\n')
 
         switch {
+		case multiReadRe.MatchString(input):
+			matches := multiReadRe.FindStringSubmatch(input)
+			fmt.Println("Mutliread for file ", matches[1])
+			Multiread(matches[1])
         case putRe.MatchString(input):
             matches := putRe.FindStringSubmatch(input)
             if len(matches) == 3 {
