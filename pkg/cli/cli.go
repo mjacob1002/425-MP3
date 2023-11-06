@@ -52,6 +52,7 @@ func ListenToCommands(){
                 sdfsFilename := matches[2]
                 index := fs.GetFileOwner(sdfsFilename)
                 fs.Put(fs.MachineStubs[fs.MachineIds[index]], localFilename, sdfsFilename, false)
+                fmt.Printf("done")
             }
         case getRe.MatchString(input):
             matches := getRe.FindStringSubmatch(input)
@@ -60,6 +61,7 @@ func ListenToCommands(){
                 localFilename := matches[2]
                 index := fs.GetFileOwner(sdfsFilename)
                 fs.Get(fs.MachineStubs[fs.MachineIds[index]], sdfsFilename, localFilename)
+                fmt.Printf("done")
             }
         case deleteRe.MatchString(input):
             matches := deleteRe.FindStringSubmatch(input)
@@ -67,6 +69,7 @@ func ListenToCommands(){
                 sdfsFilename := matches[1]
                 index := fs.GetFileOwner(sdfsFilename)
                 fs.Delete(fs.MachineStubs[fs.MachineIds[index]], sdfsFilename, false)
+                fmt.Printf("done")
             }
         case lsRe.MatchString(input):
             matches := lsRe.FindStringSubmatch(input)
