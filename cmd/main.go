@@ -43,6 +43,7 @@ func onAdd(machineId string, serverAddress string) {
 
     if recentlyAdded {
     } else if len(fs.MachineIds) < 4 || (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds) <= 3  {
+        fmt.Printf("worst\n")
         // We need to copy files around to ensure we have 3 replicas of files
         sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + 0) % len(fs.MachineIds)])
         for _, sdfsFilename := range sdfsFilenames {
@@ -50,6 +51,7 @@ func onAdd(machineId string, serverAddress string) {
             fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, true)
         }
     } else if (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
+        fmt.Printf("distance: %v\n", (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds))
         newFiles := []string{}
         for _, file := range fs.Files {
             ownerIndex := fs.GetFileOwner(file)
@@ -65,6 +67,8 @@ func onAdd(machineId string, serverAddress string) {
             }
         }
         fs.Files = newFiles
+    } else {
+        fmt.Printf("distance: %v\n", (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds))
     }
 
     // Append new machine id to list
