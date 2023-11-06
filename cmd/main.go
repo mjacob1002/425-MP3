@@ -169,7 +169,7 @@ func main() {
         time.Sleep(5 * time.Second)
         recentlyAdded = false
     }()
-
+	fmt.Println(fs.TempDirectory)
     go cli.ListenToCommands()
 
 	select {}

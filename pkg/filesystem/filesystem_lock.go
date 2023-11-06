@@ -7,7 +7,7 @@ import (
 
 type FileStruct struct {
 	Sdfsname string
-	Rwlock FileRWLock;
+	Rwlock sync.RWMutex
 	deleted bool;
 	replica int64; // is -1 when I own it, otherwise it's the node that send the replica
 }
@@ -31,11 +31,11 @@ func (s *FileStruct) RUnlock() {
 }
 
 func (s *FileStruct) WLock() {
-	s.Rwlock.WLock();
+	s.Rwlock.Lock();
 }
 
 func (s *FileStruct) WUnlock(){
-	s.Rwlock.WUnlock()
+	s.Rwlock.Unlock()
 }
 
 func NewFileStruct(sdfsName string, replica int64) *FileStruct{
@@ -44,7 +44,7 @@ func NewFileStruct(sdfsName string, replica int64) *FileStruct{
 		deleted: false,
 		replica: replica,
 	}
-	fileObject.Rwlock.Init()
+	// fileObject.Rwlock.Init()
 	return &fileObject
 }
 

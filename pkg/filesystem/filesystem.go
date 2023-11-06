@@ -5,16 +5,17 @@ import (
     "path/filepath"
     "fmt"
     "io"
+	"math/rand"
     "net"
     "os"
     "log"
     "google.golang.org/grpc"
     "sort"
+	"strconv"
 	"sync"
     "hash/fnv"
     "google.golang.org/protobuf/types/known/emptypb"
     "time"
-    "sync"
 )
 
 var TempDirectory string
@@ -93,7 +94,8 @@ func (s *Server) Get(in *GetRequest, stream FileSystem_GetServer) error {
     filename := filepath.Join(TempDirectory, in.SdfsName)
     file, err := os.Open(filename)
     if err != nil {
-        fmt.Printf(fmt.Errorf("os.Open: %v\n", err).Error())
+		fmt.Println("failure here");
+        fmt.Printf(fmt.Errorf("os.Create: %v\n", err).Error())
         return err
     }
 
@@ -178,7 +180,6 @@ func (s *Server) Put(stream FileSystem_PutServer) error {
             if idx == ThisMachineIdIdx {
                 break
             }
- 
             if err := Put(MachineStubs[MachineIds[idx]], filename, sdfsFilename, true); err != nil {
                 fmt.Printf(fmt.Errorf("Put: %v\n", err).Error())
             }
@@ -196,7 +197,7 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
         return err
     }
 
-    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 300 * time.Second)
     defer cancel()
 
     stream, err := targetStub.Put(contextWithTimeout)
@@ -230,7 +231,7 @@ func Put(targetStub FileSystemClient, localFilename string, sdfsFilename string,
 }
 
 func Delete(targetStub FileSystemClient, sdfsFilename string, replica bool) error {
-    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 300 * time.Second)
     defer cancel()
 
     request := DeleteRequest{ SdfsName: sdfsFilename, Replica: replica }
@@ -252,6 +253,28 @@ func Remove(slice []string, element string) []string {
         }
     }
     return newSlice
+}
+
+func InvokeARead(machine_id string, sdfsname string){
+		res, err := MachineStubs[machine_id].InvokeRead(context.Background(), &InvokeReadRequest{SdfsName: sdfsname})
+		if err != nil {
+			fmt.Println(err);
+		}
+		fmt.Printf("%s read %s to create %s\n", machine_id, sdfsname, res.LocalName)
+}
+
+func (s *Server) InvokeRead(ctx context.Context, in *InvokeReadRequest) (*InvokeReadResponse, error) {
+	sdfsName := in.SdfsName;
+	randNum := rand.Intn(1000)
+	randNumString := strconv.Itoa(randNum)
+	localFilename := sdfsName + "_" + randNumString
+	index  := GetFileOwner(sdfsName)
+	fmt.Printf("about to ping %s for get...\n", MachineIds[index])
+	err := Get(MachineStubs[MachineIds[index]], sdfsName, localFilename)
+	if err != nil {
+		fmt.Println(err);
+	}
+	return &InvokeReadResponse{LocalName: localFilename}, nil
 }
 
 func (s *Server) Delete(ctx context.Context, in *DeleteRequest) (*emptypb.Empty, error) {
@@ -299,7 +322,7 @@ func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string)
     }
     defer file.Close()
 
-    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 300 * time.Second)
     defer cancel()
 
     stream, err := targetStub.Get(contextWithTimeout, &request)
@@ -317,6 +340,7 @@ func Get(targetStub FileSystemClient, sdfsFilename string, localFilename string)
             log.Fatal(err)
             return err
         }
+		fmt.Println("about to write payload...\n")
         // write to the file
         file.Write([]byte(response.Payload))
     }
@@ -364,7 +388,7 @@ func FileRangeHash(start uint32, end uint32) []string {
 func FileRange(targetStub FileSystemClient, start uint32, end uint32) ([]string, error) {
     request := &FileRangeRequest{ Start: start, End: end }
 
-    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+    contextWithTimeout, cancel := context.WithTimeout(context.Background(), 300 * time.Second)
     defer cancel()
 
     response, err := targetStub.FileRange(contextWithTimeout, request)
