@@ -50,33 +50,18 @@ func onAdd(machineId string, serverAddress string) {
             fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, true)
         }
     } else if (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
-        sdfsFilenames := fs.FileRangeNodes(
-            fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)],
-            fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)],
-        )
+        for _, file := range fs.Files {
+            ownerIndex := fs.GetFileOwner(sdfsFilename)
 
-        /*
-        fmt.Println("start")
-        fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)]))
+            if (fs.ThisMachineIdIdx + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds) == 3 && (index + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds) <= 3 {
+                filename := filepath.Join(fs.TempDirectory, sdfsFilename)
+                if err := os.Remove(filename); err != nil {
+                    fmt.Printf(fmt.Errorf("os.Remove: %v\n", err).Error())
+                }
 
-        fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 3) % len(fs.MachineIds)]))
-
-        fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 3) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 2) % len(fs.MachineIds)]))
-
-        fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 2) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)]))
-
-        fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 0) % len(fs.MachineIds)]))
-        fmt.Println("end")
-        */
-
-        for _, sdfsFilename := range sdfsFilenames {
-            filename := filepath.Join(fs.TempDirectory, sdfsFilename)
-            if err := os.Remove(filename); err != nil {
-                fmt.Printf(fmt.Errorf("os.Remove: %v\n", err).Error())
+                // Remove filename from local file list
+                fs.Files = fs.Remove(fs.Files, sdfsFilename)
             }
-
-            // Remove filename from local file list
-            fs.Files = fs.Remove(fs.Files, sdfsFilename)
         }
     }
 
