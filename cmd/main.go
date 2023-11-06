@@ -56,40 +56,15 @@ func onAdd(machineId string, serverAddress string) {
         )
 
         fmt.Println("start")
-        fmt.Println(
-            fs.FileRangeNodes(
-                fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)],
-                fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)],
-            )
-        )
+        fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 5) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)]))
 
-        fmt.Printf(
-            fs.FileRangeNodes(
-                fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)],
-                fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 3) % len(fs.MachineIds)],
-            )
-        )
+        fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 4) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 3) % len(fs.MachineIds)]))
 
-        fmt.Printf(
-            fs.FileRangeNodes(
-                fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 3) % len(fs.MachineIds)],
-                fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 2) % len(fs.MachineIds)],
-            )
-        )
+        fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 3) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 2) % len(fs.MachineIds)]))
 
-        fmt.Printf(
-            fs.FileRangeNodes(
-                fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 2) % len(fs.MachineIds)],
-                fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)],
-            )
-        )
+        fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 2) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)]))
 
-        fmt.Printf(
-            fs.FileRangeNodes(
-                fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)],
-                fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 0) % len(fs.MachineIds)],
-            )
-        )
+        fmt.Printf("%v\n", fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 0) % len(fs.MachineIds)]))
         fmt.Println("end")
 
         for _, sdfsFilename := range sdfsFilenames {
