@@ -42,7 +42,7 @@ func onAdd(machineId string, serverAddress string) {
     fs.InitializeGRPCConnection(machineId, serverAddress)
 
     if recentlyAdded {
-    } else if len(fs.MachineIds) < 4 || (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds) <= 3  {
+    } else if len(fs.MachineIds) < 4 || (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds) < 3  {
         fmt.Printf("worst: %v < 4, %v <= 3\n", len(fs.MachineIds), (index + len(fs.MachineIds) - fs.ThisMachineIdIdx) % len(fs.MachineIds))
         // We need to copy files around to ensure we have 3 replicas of files
         sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + 0) % len(fs.MachineIds)])
