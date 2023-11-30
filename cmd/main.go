@@ -42,28 +42,49 @@ func onAdd(machineId string, serverAddress string) {
     fs.InitializeGRPCConnection(machineId, serverAddress)
 
     if recentlyAdded {
-    } else if len(fs.MachineIds) < 4 || (index + len(fs.MachineIds) + 1 - fs.ThisMachineIdIdx) % (len(fs.MachineIds) + 1) < 3  {
+        // Do nothing, just wait
+    } else if len(fs.MachineIds) < 4 || (index - fs.ThisMachineIdIdx + len(fs.MachineIds) + 1) % (len(fs.MachineIds) + 1) < 3  {
         // We need to copy files around to ensure we have 3 replicas of files
-        sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx + len(fs.MachineIds) - 1) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx + 0) % len(fs.MachineIds)])
+        sdfsFilenames := fs.FileRangeNodes( fs.MachineIds[(fs.ThisMachineIdIdx - 1 + len(fs.MachineIds)) % len(fs.MachineIds)], fs.MachineIds[fs.ThisMachineIdIdx])
+
         for _, sdfsFilename := range sdfsFilenames {
             fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, true)
         }
-    } else if (fs.ThisMachineIdIdx + len(fs.MachineIds) - index) % len(fs.MachineIds) < 4  {
+    } else if (fs.ThisMachineIdIdx - index + len(fs.MachineIds)) % len(fs.MachineIds) <= 4 {
         newFiles := []string{}
-        for _, file := range fs.Files {
-            ownerIndex := fs.GetFileOwner(file)
 
-            if (fs.ThisMachineIdIdx + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds) == 3 && (index + len(fs.MachineIds) - ownerIndex) % len(fs.MachineIds) <= 3 {
+        var startNode string
+        if (fs.ThisMachineIdIdx - index + len(fs.MachineIds)) % len(fs.MachineIds) == 4 {
+            startNode = machineId
+        } else {
+            startNode = fs.MachineIds[(fs.ThisMachineIdIdx - 3 + len(fs.MachineIds)) % len(fs.MachineIds)]
+        }
+
+        hasher := fnv.New32a()
+
+        hasher.Write([]byte(startNode))
+        start := hasher.Sum32()
+        hasher.Reset()
+
+        hasher.Write([]byte(thisMachineId))
+        end := hasher.Sum32()
+        hasher.Reset()
+
+        for _, file := range fs.Files {
+            hasher.Write([]byte(file))
+            fileHash  := hasher.Sum32()
+            hasher.Reset()
+
+            if (start < end && start < fileHash && fileHash <= end) || (end <= start && (start < fileHash || fileHash <= end)) {
+                newFiles = append(newFiles, file)
+            } else {
                 filename := filepath.Join(fs.TempDirectory, file)
                 if err := os.Remove(filename); err != nil {
                     fmt.Printf(fmt.Errorf("os.Remove: %v\n", err).Error())
                 }
-            } else {
-                newFiles = append(newFiles, file)
             }
         }
         fs.Files = newFiles
-    } else {
     }
 
     // Append new machine id to list
