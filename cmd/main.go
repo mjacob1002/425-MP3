@@ -18,6 +18,40 @@ var thisMachineName string
 var thisMachineId string
 var recentlyAdded bool = true
 
+func deleteAllFilesInRange(startNode string, endNode string) {
+    newFiles := []string{}
+
+    hasher := fnv.New32a()
+
+    hasher.Write([]byte(startNode))
+    start := hasher.Sum32()
+    hasher.Reset()
+
+    hasher.Write([]byte(endNode))
+    end := hasher.Sum32()
+    hasher.Reset()
+
+    fmt.Printf("start: %v, end: %v\n", startNode, endNode)
+
+    for _, file := range fs.Files {
+        hasher.Write([]byte(file))
+        fileHash  := hasher.Sum32()
+        hasher.Reset()
+
+        if (start < end && start < fileHash && fileHash <= end) || (end <= start && (start < fileHash || fileHash <= end)) {
+            newFiles = append(newFiles, file)
+        } else {
+            filename := filepath.Join(fs.TempDirectory, file)
+            fmt.Printf("deleting file %v\n", file)
+            if err := os.Remove(filename); err != nil {
+                fmt.Printf(fmt.Errorf("os.Remove: %v\n", err).Error())
+            }
+        }
+    }
+    fs.Files = newFiles
+    fmt.Printf("keeping files %v\n", newFiles)
+}
+
 func onAdd(machineId string, serverAddress string) {
     fmt.Println("Adding new node to membership list:", machineId)
 
@@ -41,9 +75,22 @@ func onAdd(machineId string, serverAddress string) {
 
     fs.InitializeGRPCConnection(machineId, serverAddress)
 
+    defer func() {
+        // Append new machine id to list
+        fs.MachineIds = append(fs.MachineIds[:index], append([]string{machineId}, fs.MachineIds[index:]...)...)
+        if index <= fs.ThisMachineIdIdx {
+            fs.ThisMachineIdIdx++
+        }
+    }()
+
+    ahead := (index - fs.ThisMachineIdIdx + len(fs.MachineIds)) % len(fs.MachineIds)
+    behind := (fs.ThisMachineIdIdx - index + len(fs.MachineIds)) % len(fs.MachineIds)
+
     if recentlyAdded {
-        // Do nothing, just wait
-    } else if diff := (index - fs.ThisMachineIdIdx + len(fs.MachineIds)) % len(fs.MachineIds); len(fs.MachineIds) < 4 || (diff > 0 && diff <= 3)  {
+        return
+    }
+
+    if len(fs.MachineIds) < 4 {
         fmt.Printf("line 47\n")
         // We need to copy files around to ensure we have 3 replicas of files
         sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx - 1 + len(fs.MachineIds)) % len(fs.MachineIds)], fs.MachineIds[fs.ThisMachineIdIdx])
@@ -51,52 +98,34 @@ func onAdd(machineId string, serverAddress string) {
         for _, sdfsFilename := range sdfsFilenames {
             fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, true)
         }
-    } else if (fs.ThisMachineIdIdx - index + len(fs.MachineIds)) % len(fs.MachineIds) <= 4 {
-        fmt.Printf("line 55\n")
-        newFiles := []string{}
 
-        var startNode string
-        if (fs.ThisMachineIdIdx - index + len(fs.MachineIds)) % len(fs.MachineIds) == 4 {
-            startNode = machineId
-        } else {
-            startNode = fs.MachineIds[(fs.ThisMachineIdIdx - 3 + len(fs.MachineIds)) % len(fs.MachineIds)]
-        }
-
-        hasher := fnv.New32a()
-
-        hasher.Write([]byte(startNode))
-        start := hasher.Sum32()
-        hasher.Reset()
-
-        hasher.Write([]byte(thisMachineId))
-        end := hasher.Sum32()
-        hasher.Reset()
-
-        fmt.Printf("start: %v, end: %v\n", startNode, thisMachineId)
-
-        for _, file := range fs.Files {
-            hasher.Write([]byte(file))
-            fileHash  := hasher.Sum32()
-            hasher.Reset()
-
-            if (start < end && start < fileHash && fileHash <= end) || (end <= start && (start < fileHash || fileHash <= end)) {
-                newFiles = append(newFiles, file)
-            } else {
-                filename := filepath.Join(fs.TempDirectory, file)
-                fmt.Printf("deleting file %v\n", file)
-                if err := os.Remove(filename); err != nil {
-                    fmt.Printf(fmt.Errorf("os.Remove: %v\n", err).Error())
-                }
-            }
-        }
-        fs.Files = newFiles
-        fmt.Printf("keeping files %v\n", newFiles)
+        return
     }
 
-    // Append new machine id to list
-	fs.MachineIds = append(fs.MachineIds[:index], append([]string{machineId}, fs.MachineIds[index:]...)...)
-    if index <= fs.ThisMachineIdIdx {
-        fs.ThisMachineIdIdx++
+    if behind == 4 {
+        // remove (x - 4, new]
+        deleteAllFilesInRange(fs.MachineIds[(fs.ThisMachineIdIdx - 4 + len(fs.MachineIds)) % len(fs.MachineIds)], machineId)
+    } else if behind <= 3 {
+        // remove (x - 4, x - 3]
+        deleteAllFilesInRange(fs.MachineIds[(fs.ThisMachineIdIdx - 4 + len(fs.MachineIds)) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx - 3 + len(fs.MachineIds)) % len(fs.MachineIds)])
+    }
+
+    if fs.ThisMachineIdIdx == index {
+        // copy (x - 1, new] to new
+        sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx - 1 + len(fs.MachineIds)) % len(fs.MachineIds)], machineId)
+
+        for _, sdfsFilename := range sdfsFilenames {
+            fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, true)
+        }
+    }
+
+    if ahead > 0 && ahead <= 3 {
+        // copy (x - 1, x] to new
+        sdfsFilenames := fs.FileRangeNodes(fs.MachineIds[(fs.ThisMachineIdIdx - 1 + len(fs.MachineIds)) % len(fs.MachineIds)], fs.MachineIds[fs.ThisMachineIdIdx])
+
+        for _, sdfsFilename := range sdfsFilenames {
+            fs.Put(fs.MachineStubs[machineId], filepath.Join(fs.TempDirectory, sdfsFilename), sdfsFilename, true)
+        }
     }
 }
 
