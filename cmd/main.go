@@ -39,13 +39,13 @@ func deleteAllFilesInRange(startNode string, endNode string) {
         hasher.Reset()
 
         if (start < end && start < fileHash && fileHash <= end) || (end <= start && (start < fileHash || fileHash <= end)) {
-            newFiles = append(newFiles, file)
-        } else {
             filename := filepath.Join(fs.TempDirectory, file)
             fmt.Printf("deleting file %v\n", file)
             if err := os.Remove(filename); err != nil {
                 fmt.Printf(fmt.Errorf("os.Remove: %v\n", err).Error())
             }
+        } else {
+            newFiles = append(newFiles, file)
         }
     }
     fs.Files = newFiles
