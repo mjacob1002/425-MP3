@@ -102,10 +102,10 @@ func onAdd(machineId string, serverAddress string) {
         return
     }
 
-    if behind == 4 {
+    if behind == 3 {
         // remove (x - 4, new]
         deleteAllFilesInRange(fs.MachineIds[(fs.ThisMachineIdIdx - 4 + len(fs.MachineIds)) % len(fs.MachineIds)], machineId)
-    } else if behind <= 3 {
+    } else if behind <= 2 {
         // remove (x - 4, x - 3]
         deleteAllFilesInRange(fs.MachineIds[(fs.ThisMachineIdIdx - 4 + len(fs.MachineIds)) % len(fs.MachineIds)], fs.MachineIds[(fs.ThisMachineIdIdx - 3 + len(fs.MachineIds)) % len(fs.MachineIds)])
     }
